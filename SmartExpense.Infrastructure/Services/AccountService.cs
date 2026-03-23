@@ -263,7 +263,7 @@ public class AccountService : IAccountService
         var emailBody = $"""
                          Hello {user.FirstName},
 
-                         You requested to reset your password for BookVerse.Api.
+                         You requested to reset your password for SmartExpense.Api.
 
                          Please use the following token to reset your password:
 
@@ -276,12 +276,12 @@ public class AccountService : IAccountService
                          For security reasons, never share this token with anyone.
 
                          Best regards,
-                         BookVerse.Api Support Team
+                         SmartExpense.Api Support Team
                          """;
 
         await _emailService.SendEmailAsync(
             user.Email!,
-            "BookVerse.Api Password Reset",
+            "SmartExpense.Api Password Reset",
             emailBody
         );
         _logger.LogInformation("Password reset email sent to: {Email}", user.Email);
