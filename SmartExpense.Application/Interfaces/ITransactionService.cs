@@ -12,4 +12,5 @@ public interface ITransactionService
     Task<TransactionReadDto> CreateAsync(TransactionCreateDto dto, Guid userId);
     Task<TransactionReadDto> UpdateAsync(int id, TransactionUpdateDto dto, Guid userId);
     Task DeleteAsync(int id, Guid userId);
+    Task<string> ExportToCsvAsync(Guid userId, DateTime startDate, DateTime endDate);
 }
