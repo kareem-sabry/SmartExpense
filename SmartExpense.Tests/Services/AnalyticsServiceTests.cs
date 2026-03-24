@@ -13,6 +13,7 @@ public class AnalyticsServiceTests
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
     private readonly Mock<IBudgetRepository> _budgetRepositoryMock;
+    private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
     private readonly AnalyticsService _sut;
     private readonly Guid _userId;
 
@@ -21,13 +22,17 @@ public class AnalyticsServiceTests
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _transactionRepositoryMock = new Mock<ITransactionRepository>();
         _budgetRepositoryMock = new Mock<IBudgetRepository>();
-
+        _dateTimeProviderMock = new Mock<IDateTimeProvider>();
+        
         _userId = Guid.NewGuid();
-
+        _dateTimeProviderMock
+            .Setup(x => x.UtcNow)
+            .Returns(new DateTime(2025, 2, 15, 12, 0, 0, DateTimeKind.Utc));
+        
         _unitOfWorkMock.Setup(x => x.Transactions).Returns(_transactionRepositoryMock.Object);
         _unitOfWorkMock.Setup(x => x.Budgets).Returns(_budgetRepositoryMock.Object);
 
-        _sut = new AnalyticsService(_unitOfWorkMock.Object);
+        _sut = new AnalyticsService(_unitOfWorkMock.Object,_dateTimeProviderMock.Object);
     }
 
     #region GetFinancialOverviewAsync Tests

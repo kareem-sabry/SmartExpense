@@ -6,15 +6,37 @@ using SmartExpense.Core.Models;
 
 namespace SmartExpense.Infrastructure.Services;
 
+/// <summary>
+/// Provides financial analytics including spending trends, category breakdowns,
+/// month-over-month comparisons, and budget performance tracking.
+/// All date/time operations use the injected <see cref="IDateTimeProvider"/>
+/// to ensure deterministic behaviour and full testability.
+/// </summary>
+
 public class AnalyticsService : IAnalyticsService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IDateTimeProvider _dateTimeProvider;
 
-    public AnalyticsService(IUnitOfWork unitOfWork)
+    /// <summary>Initialises a new instance of <see cref="AnalyticsService"/>.</summary>
+    /// <param name="unitOfWork">Unit of Work providing access to all repositories.</param>
+    /// <param name="dateTimeProvider">
+    /// Abstraction over the system clock. Injected so tests can control the current date
+    /// without relying on <see cref="DateTime.UtcNow"/> directly.
+    /// </param>
+    public AnalyticsService(IUnitOfWork unitOfWork,IDateTimeProvider dateTimeProvider)
     {
         _unitOfWork = unitOfWork;
+        _dateTimeProvider = dateTimeProvider;
     }
-
+    /// <summary>
+    /// Returns a complete financial overview for the given date range, including totals,
+    /// savings rate, average daily income/expense, transaction counts, top categories,
+    /// and a daily spending trend.
+    /// </summary>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <param name="startDate">The inclusive start of the reporting period (UTC).</param>
+    /// <param name="endDate">The inclusive end of the reporting period (UTC).</param>
     public async Task<FinancialOverviewDto> GetFinancialOverviewAsync(
         Guid userId,
         DateTime startDate,
@@ -60,7 +82,17 @@ public class AnalyticsService : IAnalyticsService
             DailyTrend = dailyTrend
         };
     }
-
+    /// <summary>
+    /// Returns spending and income trends grouped by day, week, or month
+    /// over the specified date range.
+    /// </summary>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <param name="startDate">The inclusive start of the date range (UTC).</param>
+    /// <param name="endDate">The inclusive end of the date range (UTC).</param>
+    /// <param name="groupBy">
+    /// Grouping granularity: <c>"daily"</c>, <c>"weekly"</c>, or <c>"monthly"</c>.
+    /// Defaults to <c>"monthly"</c> for unrecognised values.
+    /// </param>
     public async Task<List<SpendingTrendDto>> GetSpendingTrendsAsync(
         Guid userId,
         DateTime startDate,
@@ -84,7 +116,18 @@ public class AnalyticsService : IAnalyticsService
 
         return trends;
     }
-
+    /// <summary>
+    /// Returns a breakdown of spending (or income) by category for the given period,
+    /// including the percentage contribution of each category to the total.
+    /// Results are ordered from highest to lowest amount.
+    /// </summary>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <param name="startDate">The inclusive start of the date range (UTC).</param>
+    /// <param name="endDate">The inclusive end of the date range (UTC).</param>
+    /// <param name="expenseOnly">
+    /// When <c>true</c> (default), analyses expenses only.
+    /// When <c>false</c>, analyses income.
+    /// </param>
     public async Task<List<CategoryBreakdownDto>> GetCategoryBreakdownAsync(
         Guid userId,
         DateTime startDate,
@@ -120,13 +163,22 @@ public class AnalyticsService : IAnalyticsService
 
         return breakdown;
     }
-
+    /// <summary>
+    /// Returns a month-over-month income and expense comparison for the last
+    /// <paramref name="numberOfMonths"/> months, including percentage changes
+    /// between consecutive months.
+    /// </summary>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <param name="numberOfMonths">
+    /// How many months to include in the comparison, counting backwards from the current month.
+    /// Defaults to 6.
+    /// </param>
     public async Task<List<MonthlyComparisonDto>> GetMonthlyComparisonAsync(
         Guid userId,
         int numberOfMonths = 6)
     {
         var comparisons = new List<MonthlyComparisonDto>();
-        var currentDate = DateTime.UtcNow;
+        var currentDate = _dateTimeProvider.UtcNow;
 
         for (int i = numberOfMonths - 1; i >= 0; i--)
         {
@@ -167,7 +219,14 @@ public class AnalyticsService : IAnalyticsService
 
         return comparisons;
     }
-
+    /// <summary>
+    /// Returns the performance of every budget for the given month and year,
+    /// comparing actual spend against the budgeted amount and indicating whether
+    /// spending is on track relative to how far through the month we currently are.
+    /// </summary>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <param name="month">The budget month to evaluate (1–12).</param>
+    /// <param name="year">The budget year to evaluate.</param>
     public async Task<List<BudgetPerformanceDto>> GetBudgetPerformanceAsync(
         Guid userId,
         int month,
@@ -197,8 +256,12 @@ public class AnalyticsService : IAnalyticsService
                         percentageUsed >= 80 ? "Approaching" : "Under";
 
             var daysInMonth = DateTime.DaysInMonth(year, month);
-            var daysPassed = DateTime.UtcNow.Day;
+            var today = _dateTimeProvider.UtcNow;
+            var daysPassed = today.Month == month && today.Year == year
+                ? today.Day
+                : daysInMonth;
             var expectedPercentage = (daysPassed / (double)daysInMonth) * 100;
+
             var isOnTrack = percentageUsed <= (decimal)expectedPercentage;
 
             performance.Add(new BudgetPerformanceDto
@@ -218,7 +281,18 @@ public class AnalyticsService : IAnalyticsService
 
         return performance.OrderByDescending(p => p.PercentageUsed).ToList();
     }
-
+    /// <summary>
+    /// Returns the top spending (or income) categories for the given date range,
+    /// ordered by total amount descending.
+    /// </summary>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <param name="startDate">The inclusive start of the date range (UTC).</param>
+    /// <param name="endDate">The inclusive end of the date range (UTC).</param>
+    /// <param name="count">Maximum number of categories to return. Defaults to 5.</param>
+    /// <param name="expenseOnly">
+    /// When <c>true</c> (default), ranks expense categories.
+    /// When <c>false</c>, ranks income categories.
+    /// </param>
     public async Task<List<TopCategoryDto>> GetTopCategoriesAsync(
         Guid userId,
         DateTime startDate,
