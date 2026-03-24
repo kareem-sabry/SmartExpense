@@ -106,5 +106,36 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
                 .HasForeignKey(r => r.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        // --------------- Indexes ---------------
+
+        // Every analytics and date-range filter query scopes by user then narrows
+        // by date, so UserId leads the composite to maximise selectivity.
+        builder.Entity<Transaction>()
+            .HasIndex(t => new { t.UserId, t.TransactionDate })
+            .HasDatabaseName("IX_Transactions_UserId_TransactionDate");
+
+        // Income/expense split queries filter on type after scoping to a user.
+        builder.Entity<Transaction>()
+            .HasIndex(t => new { t.UserId, t.TransactionType })
+            .HasDatabaseName("IX_Transactions_UserId_TransactionType");
+
+        // Budget-performance queries join transactions to a specific category
+        // within a user's data; covering both columns avoids a key lookup.
+        builder.Entity<Transaction>()
+            .HasIndex(t => new { t.UserId, t.CategoryId })
+            .HasDatabaseName("IX_Transactions_UserId_CategoryId");
+
+        // GetByMonthYearAsync always filters on all three columns; the composite
+        // order matches the most selective narrowing (user → month → year).
+        builder.Entity<Budget>()
+            .HasIndex(b => new { b.UserId, b.Month, b.Year })
+            .HasDatabaseName("IX_Budgets_UserId_Month_Year");
+
+        // The generation worker selects only active rules per user, so IsActive
+        // trails UserId to let the engine skip inactive rows cheaply.
+        builder.Entity<RecurringTransaction>()
+            .HasIndex(r => new { r.UserId, r.IsActive })
+            .HasDatabaseName("IX_RecurringTransactions_UserId_IsActive");
     }
 }
