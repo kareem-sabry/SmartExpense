@@ -7,17 +7,31 @@ using SmartExpense.Core.Exceptions;
 
 namespace SmartExpense.Infrastructure.Services;
 
+/// <summary>
+/// Manages monthly budgets per category, including creation, tracking of actual spend,
+/// and status calculation (Under, Approaching, Exceeded).
+/// </summary>
 public class BudgetService : IBudgetService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _dateTimeProvider;
 
+    /// <summary>Initialises a new instance of <see cref="BudgetService"/>.</summary>
+    /// <param name="unitOfWork">Unit of Work providing access to all repositories.</param>
+    /// <param name="dateTimeProvider">Abstraction over the system clock for testability.</param>
     public BudgetService(IUnitOfWork unitOfWork, IDateTimeProvider dateTimeProvider)
     {
         _unitOfWork = unitOfWork;
         _dateTimeProvider = dateTimeProvider;
     }
 
+    /// <summary>
+    /// Returns all budgets for the given user, optionally filtered by month and/or year.
+    /// Each budget includes its current spend and percentage used, calculated live from transactions.
+    /// </summary>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <param name="month">Optional month filter (1–12).</param>
+    /// <param name="year">Optional year filter.</param>
     public async Task<List<BudgetReadDto>> GetAllAsync(Guid userId, int? month, int? year)
     {
         var budgets = await _unitOfWork.Budgets.GetAllForUserAsync(userId, month, year);
@@ -32,6 +46,14 @@ public class BudgetService : IBudgetService
         return budgetDtos;
     }
 
+    /// <summary>
+    /// Returns a single budget by ID, scoped to the authenticated user.
+    /// </summary>
+    /// <param name="id">The budget ID.</param>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <exception cref="NotFoundException">
+    /// Thrown when the budget does not exist or belongs to a different user.
+    /// </exception>
     public async Task<BudgetReadDto> GetByIdAsync(int id, Guid userId)
     {
         var budget = await _unitOfWork.Budgets.GetByIdForUserAsync(id, userId);
@@ -42,6 +64,13 @@ public class BudgetService : IBudgetService
         return await MapToReadDtoAsync(budget, userId);
     }
 
+    /// <summary>
+    /// Returns an aggregated summary of all budgets for the given month and year,
+    /// including total budgeted, total spent, remaining, and counts by status.
+    /// </summary>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <param name="month">The target month (1–12).</param>
+    /// <param name="year">The target year.</param>
     public async Task<BudgetSummaryDto> GetSummaryAsync(Guid userId, int month, int year)
     {
         var budgets = await _unitOfWork.Budgets.GetByMonthYearAsync(userId, month, year);
@@ -84,6 +113,16 @@ public class BudgetService : IBudgetService
         };
     }
 
+    /// <summary>
+    /// Creates a new budget for a specific category and month/year period.
+    /// Prevents duplicate budgets for the same category and period.
+    /// Budgets cannot be created for past months.
+    /// </summary>
+    /// <param name="dto">The budget creation payload.</param>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <exception cref="NotFoundException">Thrown when the category does not exist or belongs to a different user.</exception>
+    /// <exception cref="ConflictException">Thrown when a budget already exists for this category and period.</exception>
+    /// <exception cref="ValidationException">Thrown when the target month is in the past.</exception>
     public async Task<BudgetReadDto> CreateAsync(BudgetCreateDto dto, Guid userId)
     {
         // Validate category exists
@@ -126,6 +165,14 @@ public class BudgetService : IBudgetService
         return await MapToReadDtoAsync(created!, userId);
     }
 
+    /// <summary>
+    /// Updates the budget amount for an existing budget. Only the amount can be changed;
+    /// the category and period are immutable after creation.
+    /// </summary>
+    /// <param name="id">The budget ID to update.</param>
+    /// <param name="dto">The update payload containing the new amount.</param>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <exception cref="NotFoundException">Thrown when the budget does not exist or belongs to a different user.</exception>
     public async Task<BudgetReadDto> UpdateAsync(int id, BudgetUpdateDto dto, Guid userId)
     {
         var budget = await _unitOfWork.Budgets.GetByIdForUserAsync(id, userId);
@@ -141,7 +188,12 @@ public class BudgetService : IBudgetService
         var updated = await _unitOfWork.Budgets.GetByIdForUserAsync(id, userId);
         return await MapToReadDtoAsync(updated!, userId);
     }
-
+    /// <summary>
+    /// Permanently deletes a budget. Previously recorded transactions are not affected.
+    /// </summary>
+    /// <param name="id">The budget ID to delete.</param>
+    /// <param name="userId">The ID of the authenticated user.</param>
+    /// <exception cref="NotFoundException">Thrown when the budget does not exist or belongs to a different user.</exception>
     public async Task DeleteAsync(int id, Guid userId)
     {
         var budget = await _unitOfWork.Budgets.GetByIdForUserAsync(id, userId);
@@ -154,14 +206,20 @@ public class BudgetService : IBudgetService
     }
 
     #region Private Helper Methods
-
+    
+    /// <summary>
+    /// Maps a <see cref="Budget"/> entity to a <see cref="BudgetReadDto"/> by calculating
+    /// the actual spend for the budget's category during its period via a single targeted query.
+    /// </summary>
+    /// <param name="budget">The budget entity to map.</param>
+    /// <param name="userId">The ID of the user, used to scope the transaction query.</param>
     private async Task<BudgetReadDto> MapToReadDtoAsync(Budget budget, Guid userId)
     {
         // Calculate spent amount for this category in this month/year
         var startDate = new DateTime(budget.Year, budget.Month, 1);
         var endDate = startDate.AddMonths(1).AddDays(-1);
 
-        var spent = await _unitOfWork.Transactions.GetTotalExpenseAsync(
+        await _unitOfWork.Transactions.GetTotalExpenseAsync(
             userId,
             startDate,
             endDate
@@ -208,6 +266,12 @@ public class BudgetService : IBudgetService
         };
     }
 
+    /// <summary>
+    /// Determines the <see cref="BudgetStatus"/> based on how much of the budget has been used.
+    /// Under 80% → <see cref="BudgetStatus.UnderBudget"/>,
+    /// 80–99% → <see cref="BudgetStatus.Approaching"/>,
+    /// 100%+ → <see cref="BudgetStatus.Exceeded"/>.
+    /// </summary>
     private static BudgetStatus GetBudgetStatus(decimal percentageUsed)
     {
         if (percentageUsed >= 100)
