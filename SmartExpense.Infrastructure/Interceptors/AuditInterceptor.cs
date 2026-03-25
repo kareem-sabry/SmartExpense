@@ -10,8 +10,8 @@ namespace SmartExpense.Infrastructure.Interceptors;
 
 public class AuditInterceptor : SaveChangesInterceptor
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public AuditInterceptor(
         IHttpContextAccessor httpContextAccessor,

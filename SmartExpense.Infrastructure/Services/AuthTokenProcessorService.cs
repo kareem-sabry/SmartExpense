@@ -29,18 +29,18 @@ public class AuthTokenProcessorService : IAuthTokenProcessor
 
         var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email!),
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.ToString())
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(JwtRegisteredClaimNames.Email, user.Email!),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.ToString())
         }.Concat(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         var expires = _dateTimeProvider.UtcNow.AddMinutes(_jwtOptions.ExpirationTimeInMinutes);
 
         var token = new JwtSecurityToken(
-            issuer: _jwtOptions.Issuer,
-            audience: _jwtOptions.Audience,
-            claims: claims,
+            _jwtOptions.Issuer,
+            _jwtOptions.Audience,
+            claims,
             expires: expires,
             signingCredentials: credentials
         );

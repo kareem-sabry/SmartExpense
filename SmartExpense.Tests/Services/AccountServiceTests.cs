@@ -10,26 +10,24 @@ namespace SmartExpense.Tests.Services;
 
 public class CategoryServiceTests
 {
-    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
-    private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
     private readonly Mock<ICategoryRepository> _categoryRepositoryMock;
-    private readonly CategoryService _sut;
-    private readonly Guid _userId;
     private readonly DateTime _now;
+    private readonly CategoryService _sut;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Guid _userId;
 
     public CategoryServiceTests()
     {
         _unitOfWorkMock = new Mock<IUnitOfWork>();
-        _dateTimeProviderMock = new Mock<IDateTimeProvider>();
         _categoryRepositoryMock = new Mock<ICategoryRepository>();
 
         _userId = Guid.NewGuid();
         _now = new DateTime(2025, 1, 31, 12, 0, 0, DateTimeKind.Utc);
 
-        _dateTimeProviderMock.Setup(x => x.UtcNow).Returns(_now);
+        
         _unitOfWorkMock.Setup(x => x.Categories).Returns(_categoryRepositoryMock.Object);
 
-        _sut = new CategoryService(_unitOfWorkMock.Object, _dateTimeProviderMock.Object);
+        _sut = new CategoryService(_unitOfWorkMock.Object);
     }
 
     #region GetAllAsync Tests
@@ -45,7 +43,7 @@ public class CategoryServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetAllForUserAsync(_userId))
+            .Setup(x => x.GetAllForUserAsync(_userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(categories);
 
         // Act
@@ -62,7 +60,7 @@ public class CategoryServiceTests
     {
         // Arrange
         _categoryRepositoryMock
-            .Setup(x => x.GetAllForUserAsync(_userId))
+            .Setup(x => x.GetAllForUserAsync(_userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Category>());
 
         // Act
@@ -90,7 +88,7 @@ public class CategoryServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         // Act
@@ -109,7 +107,7 @@ public class CategoryServiceTests
     {
         // Arrange
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Category?)null);
 
         // Act
@@ -136,12 +134,12 @@ public class CategoryServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.CategoryNameExistsAsync(_userId, dto.Name, null))
+            .Setup(x => x.CategoryNameExistsAsync(_userId, dto.Name, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
         _categoryRepositoryMock
-            .Setup(x => x.AddAsync(It.IsAny<Category>()))
-            .ReturnsAsync((Category c) => c);
+            .Setup(x => x.AddAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Category c,CancellationToken cancellationToken) => c);
 
         // Act
         var result = await _sut.CreateAsync(dto, _userId);
@@ -157,9 +155,9 @@ public class CategoryServiceTests
             c.Name == dto.Name &&
             c.UserId == _userId &&
             c.IsSystemCategory == false
-        )), Times.Once);
+        ), It.IsAny<CancellationToken>()), Times.Once);
 
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -173,7 +171,7 @@ public class CategoryServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.CategoryNameExistsAsync(_userId, dto.Name, null))
+            .Setup(x => x.CategoryNameExistsAsync(_userId, dto.Name, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         // Act
@@ -183,8 +181,9 @@ public class CategoryServiceTests
         await act.Should().ThrowAsync<ConflictException>()
             .WithMessage("Category with this name already exists");
 
-        _categoryRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Category>()), Times.Never);
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Never);
+        _categoryRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion
@@ -213,11 +212,11 @@ public class CategoryServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingCategory);
 
         _categoryRepositoryMock
-            .Setup(x => x.CategoryNameExistsAsync(_userId, dto.Name, 1))
+            .Setup(x => x.CategoryNameExistsAsync(_userId, dto.Name, 1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
         // Act
@@ -232,9 +231,9 @@ public class CategoryServiceTests
             c.Id == 1 &&
             c.Name == dto.Name &&
             c.Icon == dto.Icon
-        )), Times.Once);
+        ), It.IsAny<CancellationToken>()), Times.Once);
 
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -244,7 +243,7 @@ public class CategoryServiceTests
         var dto = new CategoryUpdateDto { Name = "Updated Name" };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Category?)null);
 
         // Act
@@ -252,7 +251,7 @@ public class CategoryServiceTests
 
         // Assert
         await act.Should().ThrowAsync<NotFoundException>();
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Never);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -270,7 +269,7 @@ public class CategoryServiceTests
         var dto = new CategoryUpdateDto { Name = "Updated Name" };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(systemCategory);
 
         // Act
@@ -280,7 +279,7 @@ public class CategoryServiceTests
         await act.Should().ThrowAsync<ForbiddenException>()
             .WithMessage("Cannot update system categories");
 
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Never);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -298,11 +297,11 @@ public class CategoryServiceTests
         var dto = new CategoryUpdateDto { Name = "Category B" };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingCategory);
 
         _categoryRepositoryMock
-            .Setup(x => x.CategoryNameExistsAsync(_userId, "Category B", 1))
+            .Setup(x => x.CategoryNameExistsAsync(_userId, "Category B", 1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         // Act
@@ -312,7 +311,7 @@ public class CategoryServiceTests
         await act.Should().ThrowAsync<ConflictException>()
             .WithMessage("Category with this name already exists");
 
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Never);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion
@@ -332,15 +331,15 @@ public class CategoryServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         // Act
         await _sut.DeleteAsync(1, _userId);
 
         // Assert
-        _categoryRepositoryMock.Verify(x => x.DeleteAsync(1), Times.Once);
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _categoryRepositoryMock.Verify(x => x.DeleteAsync(1, It.IsAny<CancellationToken>()), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -348,15 +347,15 @@ public class CategoryServiceTests
     {
         // Arrange
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Category?)null);
 
         // Act
-        Func<Task> act = async () => await _sut.DeleteAsync(999, _userId);
+        var act = async () => await _sut.DeleteAsync(999, _userId);
 
         // Assert
         await act.Should().ThrowAsync<NotFoundException>();
-        _categoryRepositoryMock.Verify(x => x.DeleteAsync(It.IsAny<int>()), Times.Never);
+        _categoryRepositoryMock.Verify(x => x.DeleteAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -371,17 +370,17 @@ public class CategoryServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(systemCategory);
 
         // Act
-        Func<Task> act = async () => await _sut.DeleteAsync(1, _userId);
+        var act = async () => await _sut.DeleteAsync(1, _userId);
 
         // Assert
         await act.Should().ThrowAsync<ForbiddenException>()
             .WithMessage("Cannot delete system categories");
 
-        _categoryRepositoryMock.Verify(x => x.DeleteAsync(It.IsAny<int>()), Times.Never);
+        _categoryRepositoryMock.Verify(x => x.DeleteAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion

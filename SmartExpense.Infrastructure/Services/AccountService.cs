@@ -14,12 +14,12 @@ namespace SmartExpense.Infrastructure.Services;
 public class AccountService : IAccountService
 {
     private readonly IAuthTokenProcessor _authTokenProcessor;
-    private readonly UserManager<User> _userManager;
-    private readonly RoleManager<IdentityRole<Guid>> _roleManager;
-    private readonly IUserRepository _userRepository;
-    private readonly ILogger<AccountService> _logger;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IEmailService _emailService;
+    private readonly ILogger<AccountService> _logger;
+    private readonly RoleManager<IdentityRole<Guid>> _roleManager;
+    private readonly UserManager<User> _userManager;
+    private readonly IUserRepository _userRepository;
 
     public AccountService(IAuthTokenProcessor authTokenProcessor, UserManager<User> userManager,
         RoleManager<IdentityRole<Guid>> roleManager, IUserRepository userRepository,
@@ -105,7 +105,7 @@ public class AccountService : IAccountService
         return new RegisterResponse
         {
             Succeeded = true,
-            Message = SuccessMessages.RegistrationSuccessful,
+            Message = SuccessMessages.RegistrationSuccessful
         };
     }
 
@@ -119,7 +119,7 @@ public class AccountService : IAccountService
             return new LoginResponse
             {
                 Succeeded = false,
-                Message = ErrorMessages.InvalidCredentials,
+                Message = ErrorMessages.InvalidCredentials
             };
         }
 
@@ -156,7 +156,7 @@ public class AccountService : IAccountService
         {
             _logger.LogWarning("Account deletion attempted for non-existent user: {Email}", userEmail);
 
-            return new BasicResponse()
+            return new BasicResponse
             {
                 Succeeded = false,
                 Message = ErrorMessages.UserNotFound
@@ -189,13 +189,11 @@ public class AccountService : IAccountService
     public async Task<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest refreshTokenRequest)
     {
         if (string.IsNullOrWhiteSpace(refreshTokenRequest.RefreshToken))
-        {
-            return new RefreshTokenResponse()
+            return new RefreshTokenResponse
             {
                 Succeeded = false,
                 Message = ErrorMessages.RefreshTokenMissing
             };
-        }
 
         var user = await _userRepository.GetUserByRefreshTokenAsync(refreshTokenRequest.RefreshToken);
 
@@ -214,7 +212,7 @@ public class AccountService : IAccountService
         {
             _logger.LogInformation("Expired refresh token used for user: {Email}", user.Email);
 
-            return new RefreshTokenResponse()
+            return new RefreshTokenResponse
             {
                 Succeeded = false,
                 Message = ErrorMessages.RefreshTokenExpired
@@ -233,7 +231,7 @@ public class AccountService : IAccountService
 
         _logger.LogInformation("Token refreshed for user: {Email}", user.Email);
 
-        return new RefreshTokenResponse()
+        return new RefreshTokenResponse
         {
             Succeeded = true,
             Message = SuccessMessages.TokenRefreshed,

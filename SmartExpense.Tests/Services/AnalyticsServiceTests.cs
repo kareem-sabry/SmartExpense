@@ -10,11 +10,11 @@ namespace SmartExpense.Tests.Services;
 
 public class AnalyticsServiceTests
 {
-    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
-    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
     private readonly Mock<IBudgetRepository> _budgetRepositoryMock;
     private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
     private readonly AnalyticsService _sut;
+    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Guid _userId;
 
     public AnalyticsServiceTests()
@@ -23,16 +23,16 @@ public class AnalyticsServiceTests
         _transactionRepositoryMock = new Mock<ITransactionRepository>();
         _budgetRepositoryMock = new Mock<IBudgetRepository>();
         _dateTimeProviderMock = new Mock<IDateTimeProvider>();
-        
+
         _userId = Guid.NewGuid();
         _dateTimeProviderMock
             .Setup(x => x.UtcNow)
             .Returns(new DateTime(2025, 2, 15, 12, 0, 0, DateTimeKind.Utc));
-        
+
         _unitOfWorkMock.Setup(x => x.Transactions).Returns(_transactionRepositoryMock.Object);
         _unitOfWorkMock.Setup(x => x.Budgets).Returns(_budgetRepositoryMock.Object);
 
-        _sut = new AnalyticsService(_unitOfWorkMock.Object,_dateTimeProviderMock.Object);
+        _sut = new AnalyticsService(_unitOfWorkMock.Object, _dateTimeProviderMock.Object);
     }
 
     #region GetFinancialOverviewAsync Tests
@@ -70,19 +70,19 @@ public class AnalyticsServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetTotalIncomeAsync(_userId, startDate, endDate))
+            .Setup(x => x.GetTotalIncomeAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(1000m);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetTotalExpenseAsync(_userId, startDate, endDate))
+            .Setup(x => x.GetTotalExpenseAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(500m);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetTransactionCountAsync(_userId, startDate, endDate))
+            .Setup(x => x.GetTransactionCountAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(2);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction>
             {
                 Data = transactions,
@@ -111,19 +111,19 @@ public class AnalyticsServiceTests
         var endDate = new DateTime(2025, 1, 31);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetTotalIncomeAsync(_userId, startDate, endDate))
+            .Setup(x => x.GetTotalIncomeAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(5000m);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetTotalExpenseAsync(_userId, startDate, endDate))
+            .Setup(x => x.GetTotalExpenseAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(3500m);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetTransactionCountAsync(_userId, startDate, endDate))
+            .Setup(x => x.GetTransactionCountAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(10);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
 
         // Act
@@ -165,11 +165,11 @@ public class AnalyticsServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
 
         // Act
-        var result = await _sut.GetSpendingTrendsAsync(_userId, startDate, endDate, "monthly");
+        var result = await _sut.GetSpendingTrendsAsync(_userId, startDate, endDate);
 
         // Assert
         result.Should().HaveCount(2);
@@ -207,7 +207,7 @@ public class AnalyticsServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
 
         // Act
@@ -253,11 +253,11 @@ public class AnalyticsServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
 
         // Act
-        var result = await _sut.GetCategoryBreakdownAsync(_userId, startDate, endDate, expenseOnly: true);
+        var result = await _sut.GetCategoryBreakdownAsync(_userId, startDate, endDate);
 
         // Assert
         result.Should().HaveCount(2);
@@ -290,16 +290,19 @@ public class AnalyticsServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.Is<TransactionQueryParameters>(
-                p => p.TransactionType == TransactionType.Expense)))
+            .Setup(x => x.GetPagedAsync(_userId,
+                It.Is<TransactionQueryParameters>(p => p.TransactionType == TransactionType.Expense),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
 
         // Act
-        await _sut.GetCategoryBreakdownAsync(_userId, startDate, endDate, expenseOnly: true);
+        await _sut.GetCategoryBreakdownAsync(_userId, startDate, endDate);
 
         // Assert
-        _transactionRepositoryMock.Verify(x => x.GetPagedAsync(_userId, It.Is<TransactionQueryParameters>(
-            p => p.TransactionType == TransactionType.Expense)), Times.Once);
+        _transactionRepositoryMock.Verify(
+            x => x.GetPagedAsync(_userId,
+                It.Is<TransactionQueryParameters>(p => p.TransactionType == TransactionType.Expense),
+                It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -311,19 +314,22 @@ public class AnalyticsServiceTests
     {
         // Arrange
         _transactionRepositoryMock
-            .Setup(x => x.GetTotalIncomeAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(x => x.GetTotalIncomeAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(1000m);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetTotalExpenseAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(x => x.GetTotalExpenseAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(500m);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetTransactionCountAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(x => x.GetTransactionCountAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(10);
 
         // Act
-        var result = await _sut.GetMonthlyComparisonAsync(_userId, numberOfMonths: 3);
+        var result = await _sut.GetMonthlyComparisonAsync(_userId, 3);
 
         // Assert
         result.Should().HaveCount(3);
@@ -335,7 +341,8 @@ public class AnalyticsServiceTests
         // Arrange
         var setupCount = 0;
         _transactionRepositoryMock
-            .Setup(x => x.GetTotalIncomeAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(x => x.GetTotalIncomeAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(() =>
             {
                 setupCount++;
@@ -343,15 +350,17 @@ public class AnalyticsServiceTests
             });
 
         _transactionRepositoryMock
-            .Setup(x => x.GetTotalExpenseAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(x => x.GetTotalExpenseAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(500m);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetTransactionCountAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Setup(x => x.GetTransactionCountAsync(_userId, It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(10);
 
         // Act
-        var result = await _sut.GetMonthlyComparisonAsync(_userId, numberOfMonths: 2);
+        var result = await _sut.GetMonthlyComparisonAsync(_userId, 2);
 
         // Assert
         result.Should().HaveCount(2);
@@ -392,11 +401,11 @@ public class AnalyticsServiceTests
         };
 
         _budgetRepositoryMock
-            .Setup(x => x.GetByMonthYearAsync(_userId, month, year))
+            .Setup(x => x.GetByMonthYearAsync(_userId, month, year, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Budget> { budget });
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
 
         // Act
@@ -441,11 +450,11 @@ public class AnalyticsServiceTests
         };
 
         _budgetRepositoryMock
-            .Setup(x => x.GetByMonthYearAsync(_userId, month, year))
+            .Setup(x => x.GetByMonthYearAsync(_userId, month, year, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Budget> { budget });
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
 
         // Act
@@ -497,11 +506,11 @@ public class AnalyticsServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
 
         // Act
-        var result = await _sut.GetTopCategoriesAsync(_userId, startDate, endDate, count: 3);
+        var result = await _sut.GetTopCategoriesAsync(_userId, startDate, endDate, 3);
 
         // Assert
         result.Should().HaveCount(3);
@@ -532,11 +541,11 @@ public class AnalyticsServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
 
         // Act
-        var result = await _sut.GetTopCategoriesAsync(_userId, startDate, endDate, count: 2);
+        var result = await _sut.GetTopCategoriesAsync(_userId, startDate, endDate, 2);
 
         // Assert
         result.Should().HaveCount(2);
@@ -559,11 +568,11 @@ public class AnalyticsServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
 
         // Act
-        var result = await _sut.GetTopCategoriesAsync(_userId, startDate, endDate, count: 5);
+        var result = await _sut.GetTopCategoriesAsync(_userId, startDate, endDate);
 
         // Assert
         result[0].TotalAmount.Should().Be(300m);

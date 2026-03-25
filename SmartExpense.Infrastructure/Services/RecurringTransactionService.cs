@@ -8,8 +8,8 @@ namespace SmartExpense.Infrastructure.Services;
 
 public class RecurringTransactionService : IRecurringTransactionService
 {
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RecurringTransactionService(IUnitOfWork unitOfWork, IDateTimeProvider dateTimeProvider)
     {
@@ -17,15 +17,18 @@ public class RecurringTransactionService : IRecurringTransactionService
         _dateTimeProvider = dateTimeProvider;
     }
 
-    public async Task<List<RecurringTransactionReadDto>> GetAllAsync(Guid userId, bool? isActive = null)
+    public async Task<List<RecurringTransactionReadDto>> GetAllAsync(Guid userId, bool? isActive = null,
+        CancellationToken cancellationToken = default)
     {
-        var recurringTransactions = await _unitOfWork.RecurringTransactions.GetAllForUserAsync(userId, isActive);
+        var recurringTransactions =
+            await _unitOfWork.RecurringTransactions.GetAllForUserAsync(userId, isActive, cancellationToken);
         return recurringTransactions.Select(MapToReadDto).ToList();
     }
 
-    public async Task<RecurringTransactionReadDto> GetByIdAsync(int id, Guid userId)
+    public async Task<RecurringTransactionReadDto> GetByIdAsync(int id, Guid userId,
+        CancellationToken cancellationToken = default)
     {
-        var recurring = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(id, userId);
+        var recurring = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(id, userId, cancellationToken);
 
         if (recurring == null)
             throw new NotFoundException("RecurringTransaction", id);
@@ -33,10 +36,11 @@ public class RecurringTransactionService : IRecurringTransactionService
         return MapToReadDto(recurring);
     }
 
-    public async Task<RecurringTransactionReadDto> CreateAsync(RecurringTransactionCreateDto dto, Guid userId)
+    public async Task<RecurringTransactionReadDto> CreateAsync(RecurringTransactionCreateDto dto, Guid userId,
+        CancellationToken cancellationToken = default)
     {
         // Validate category exists
-        var category = await _unitOfWork.Categories.GetByIdForUserAsync(dto.CategoryId, userId);
+        var category = await _unitOfWork.Categories.GetByIdForUserAsync(dto.CategoryId, userId, cancellationToken);
         if (category == null)
             throw new NotFoundException("Category", dto.CategoryId);
 
@@ -61,22 +65,24 @@ public class RecurringTransactionService : IRecurringTransactionService
             IsActive = true
         };
 
-        await _unitOfWork.RecurringTransactions.AddAsync(recurring);
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.RecurringTransactions.AddAsync(recurring, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var created = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(recurring.Id, userId);
+        var created =
+            await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(recurring.Id, userId, cancellationToken);
         return MapToReadDto(created!);
     }
 
-    public async Task<RecurringTransactionReadDto> UpdateAsync(int id, RecurringTransactionUpdateDto dto, Guid userId)
+    public async Task<RecurringTransactionReadDto> UpdateAsync(int id, RecurringTransactionUpdateDto dto, Guid userId,
+        CancellationToken cancellationToken = default)
     {
-        var recurring = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(id, userId);
+        var recurring = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(id, userId, cancellationToken);
 
         if (recurring == null)
             throw new NotFoundException("RecurringTransaction", id);
 
         // Validate category
-        var category = await _unitOfWork.Categories.GetByIdForUserAsync(dto.CategoryId, userId);
+        var category = await _unitOfWork.Categories.GetByIdForUserAsync(dto.CategoryId, userId, cancellationToken);
         if (category == null)
             throw new NotFoundException("Category", dto.CategoryId);
 
@@ -96,49 +102,51 @@ public class RecurringTransactionService : IRecurringTransactionService
         recurring.EndDate = dto.EndDate;
         recurring.Notes = dto.Notes;
 
-        await _unitOfWork.RecurringTransactions.UpdateAsync(recurring);
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.RecurringTransactions.UpdateAsync(recurring, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var updated = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(id, userId);
+        var updated = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(id, userId, cancellationToken);
         return MapToReadDto(updated!);
     }
 
-    public async Task DeleteAsync(int id, Guid userId)
+    public async Task DeleteAsync(int id, Guid userId, CancellationToken cancellationToken = default)
     {
-        var recurring = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(id, userId);
+        var recurring = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(id, userId, cancellationToken);
 
         if (recurring == null)
             throw new NotFoundException("RecurringTransaction", id);
 
-        await _unitOfWork.RecurringTransactions.DeleteAsync(id);
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.RecurringTransactions.DeleteAsync(id, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<RecurringTransactionReadDto> ToggleActiveAsync(int id, Guid userId)
+    public async Task<RecurringTransactionReadDto> ToggleActiveAsync(int id, Guid userId,
+        CancellationToken cancellationToken = default)
     {
-        var recurring = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(id, userId);
+        var recurring = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(id, userId, cancellationToken);
 
         if (recurring == null)
             throw new NotFoundException("RecurringTransaction", id);
 
         recurring.IsActive = !recurring.IsActive;
 
-        await _unitOfWork.RecurringTransactions.UpdateAsync(recurring);
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.RecurringTransactions.UpdateAsync(recurring, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return MapToReadDto(recurring);
     }
 
-    public async Task<GenerateTransactionsResultDto> GenerateTransactionsAsync(Guid userId)
+    public async Task<GenerateTransactionsResultDto> GenerateTransactionsAsync(Guid userId,
+        CancellationToken cancellationToken = default)
     {
         var now = _dateTimeProvider.UtcNow;
-        var dueRecurring = await _unitOfWork.RecurringTransactions.GetAllForUserAsync(userId, isActive: true);
+        var dueRecurring = await _unitOfWork.RecurringTransactions.GetAllForUserAsync(userId, true, cancellationToken);
 
         var result = new GenerateTransactionsResultDto();
 
         foreach (var recurring in dueRecurring)
         {
-            var generated = await GenerateTransactionsForRecurring(recurring, now);
+            var generated = await GenerateTransactionsForRecurring(recurring, now, cancellationToken);
             result.GeneratedTransactions.AddRange(generated);
         }
 
@@ -146,15 +154,17 @@ public class RecurringTransactionService : IRecurringTransactionService
         return result;
     }
 
-    public async Task<GenerateTransactionsResultDto> GenerateForRecurringTransactionAsync(int recurringId, Guid userId)
+    public async Task<GenerateTransactionsResultDto> GenerateForRecurringTransactionAsync(int recurringId, Guid userId,
+        CancellationToken cancellationToken = default)
     {
-        var recurring = await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(recurringId, userId);
+        var recurring =
+            await _unitOfWork.RecurringTransactions.GetByIdForUserAsync(recurringId, userId, cancellationToken);
 
         if (recurring == null)
             throw new NotFoundException("RecurringTransaction", recurringId);
 
         var now = _dateTimeProvider.UtcNow;
-        var generated = await GenerateTransactionsForRecurring(recurring, now);
+        var generated = await GenerateTransactionsForRecurring(recurring, now, cancellationToken);
 
         return new GenerateTransactionsResultDto
         {
@@ -167,7 +177,7 @@ public class RecurringTransactionService : IRecurringTransactionService
 
     private async Task<List<GeneratedTransactionInfo>> GenerateTransactionsForRecurring(
         RecurringTransaction recurring,
-        DateTime asOfDate)
+        DateTime asOfDate, CancellationToken cancellationToken = default)
     {
         var generatedInfo = new List<GeneratedTransactionInfo>();
 
@@ -177,7 +187,7 @@ public class RecurringTransactionService : IRecurringTransactionService
         foreach (var dueDate in dueDates)
         {
             // FK-based dedup: reliable regardless of description text changes
-            var exists = await TransactionExistsForDate(recurring.Id, dueDate);
+            var exists = await TransactionExistsForDate(recurring.Id, dueDate, cancellationToken);
             if (exists)
                 continue;
 
@@ -194,7 +204,7 @@ public class RecurringTransactionService : IRecurringTransactionService
                 RecurringTransactionId = recurring.Id
             };
 
-            await _unitOfWork.Transactions.AddAsync(transaction);
+            await _unitOfWork.Transactions.AddAsync(transaction, cancellationToken);
 
             generatedInfo.Add(new GeneratedTransactionInfo
             {
@@ -207,8 +217,8 @@ public class RecurringTransactionService : IRecurringTransactionService
 
         // Update last generated date
         recurring.LastGeneratedDate = asOfDate;
-        await _unitOfWork.RecurringTransactions.UpdateAsync(recurring);
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.RecurringTransactions.UpdateAsync(recurring, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return generatedInfo;
     }
@@ -224,9 +234,7 @@ public class RecurringTransactionService : IRecurringTransactionService
             // Check if within valid date range
             if (currentDate >= recurring.StartDate &&
                 (!recurring.EndDate.HasValue || currentDate <= recurring.EndDate.Value))
-            {
                 dueDates.Add(currentDate);
-            }
 
             currentDate = GetNextOccurrence(recurring.StartDate, currentDate, recurring.Frequency);
 
@@ -251,14 +259,15 @@ public class RecurringTransactionService : IRecurringTransactionService
     }
 
     /// <summary>
-    /// Checks whether a transaction has already been generated for a given recurring
-    /// template on a specific date using a targeted FK lookup.
-    /// This replaces the previous string-based approach which matched on description
-    /// text and would break if the description suffix changed.
+    ///     Checks whether a transaction has already been generated for a given recurring
+    ///     template on a specific date using a targeted FK lookup.
+    ///     This replaces the previous string-based approach which matched on description
+    ///     text and would break if the description suffix changed.
     /// </summary>
-    private async Task<bool> TransactionExistsForDate(int recurringId, DateTime date)
+    private async Task<bool> TransactionExistsForDate(int recurringId, DateTime date,
+        CancellationToken cancellationToken = default)
     {
-        return await _unitOfWork.Transactions.ExistsForRecurringOnDateAsync(recurringId, date);
+        return await _unitOfWork.Transactions.ExistsForRecurringOnDateAsync(recurringId, date, cancellationToken);
     }
 
     private RecurringTransactionReadDto MapToReadDto(RecurringTransaction recurring)

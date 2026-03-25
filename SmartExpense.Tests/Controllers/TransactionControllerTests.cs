@@ -13,8 +13,8 @@ namespace SmartExpense.Tests.Controllers;
 
 public class TransactionControllerTests
 {
-    private readonly Mock<ITransactionService> _transactionServiceMock;
     private readonly TransactionController _sut;
+    private readonly Mock<ITransactionService> _transactionServiceMock;
     private readonly Guid _userId;
 
     public TransactionControllerTests()
@@ -55,11 +55,11 @@ public class TransactionControllerTests
         };
 
         _transactionServiceMock
-            .Setup(x => x.GetPagedAsync(_userId, parameters))
+            .Setup(x => x.GetPagedAsync(_userId, parameters, It.IsAny<CancellationToken>()))
             .ReturnsAsync(pagedResult);
 
         // Act
-        var result = await _sut.GetTransactions(parameters);
+        var result = await _sut.GetTransactions(parameters, It.IsAny<CancellationToken>());
 
         // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
@@ -81,11 +81,11 @@ public class TransactionControllerTests
         };
 
         _transactionServiceMock
-            .Setup(x => x.GetByIdAsync(1, _userId))
+            .Setup(x => x.GetByIdAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(transaction);
 
         // Act
-        var result = await _sut.GetById(1);
+        var result = await _sut.GetById(1, It.IsAny<CancellationToken>());
 
         // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
@@ -109,7 +109,7 @@ public class TransactionControllerTests
         };
 
         _transactionServiceMock
-            .Setup(x => x.GetSummaryAsync(_userId, startDate, endDate))
+            .Setup(x => x.GetSummaryAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(summary);
 
         // Act
@@ -142,7 +142,7 @@ public class TransactionControllerTests
         };
 
         _transactionServiceMock
-            .Setup(x => x.CreateAsync(dto, _userId))
+            .Setup(x => x.CreateAsync(dto, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(created);
 
         // Act
@@ -159,7 +159,7 @@ public class TransactionControllerTests
     {
         // Arrange
         _transactionServiceMock
-            .Setup(x => x.DeleteAsync(1, _userId))
+            .Setup(x => x.DeleteAsync(1, _userId, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -167,6 +167,6 @@ public class TransactionControllerTests
 
         // Assert
         result.Should().BeOfType<NoContentResult>();
-        _transactionServiceMock.Verify(x => x.DeleteAsync(1, _userId), Times.Once);
+        _transactionServiceMock.Verify(x => x.DeleteAsync(1, _userId, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

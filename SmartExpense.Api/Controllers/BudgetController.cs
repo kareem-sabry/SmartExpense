@@ -46,7 +46,7 @@ public class BudgetController : ControllerBase
                 Message = "Month must be between 1 and 12."
             });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var budgets = await _budgetService.GetAllAsync(userId, month, year);
+        var budgets = await _budgetService.GetAllAsync(userId, month, year, cancellationToken);
         return Ok(budgets);
     }
 
@@ -66,7 +66,7 @@ public class BudgetController : ControllerBase
     public async Task<ActionResult<BudgetReadDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var budget = await _budgetService.GetByIdAsync(id, userId);
+        var budget = await _budgetService.GetByIdAsync(id, userId, cancellationToken);
         return Ok(budget);
     }
 
@@ -95,7 +95,7 @@ public class BudgetController : ControllerBase
                 Message = "Month must be between 1 and 12."
             });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var summary = await _budgetService.GetSummaryAsync(userId, month, year);
+        var summary = await _budgetService.GetSummaryAsync(userId, month, year, cancellationToken);
         return Ok(summary);
     }
 
@@ -122,7 +122,7 @@ public class BudgetController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var budget = await _budgetService.CreateAsync(dto, userId);
+        var budget = await _budgetService.CreateAsync(dto, userId, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = budget.Id }, budget);
     }
 
@@ -148,7 +148,7 @@ public class BudgetController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var budget = await _budgetService.UpdateAsync(id, dto, userId);
+        var budget = await _budgetService.UpdateAsync(id, dto, userId, cancellationToken);
         return Ok(budget);
     }
 
@@ -169,7 +169,7 @@ public class BudgetController : ControllerBase
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        await _budgetService.DeleteAsync(id, userId);
+        await _budgetService.DeleteAsync(id, userId, cancellationToken);
         return NoContent();
     }
 }

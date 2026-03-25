@@ -12,14 +12,14 @@ namespace SmartExpense.Tests.Services;
 
 public class BudgetServiceTests
 {
-    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
-    private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
     private readonly Mock<IBudgetRepository> _budgetRepositoryMock;
     private readonly Mock<ICategoryRepository> _categoryRepositoryMock;
-    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
-    private readonly BudgetService _sut;
-    private readonly Guid _userId;
+    private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
     private readonly DateTime _now;
+    private readonly BudgetService _sut;
+    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Guid _userId;
 
     public BudgetServiceTests()
     {
@@ -39,170 +39,6 @@ public class BudgetServiceTests
 
         _sut = new BudgetService(_unitOfWorkMock.Object, _dateTimeProviderMock.Object);
     }
-
-    #region GetAllAsync Tests
-
-    [Fact]
-    public async Task GetAllAsync_ShouldReturnBudgets_WithCalculatedSpending()
-    {
-        // Arrange
-        var category = new Category { Id = 1, Name = "Food", Icon = "🍔", Color = "#FF0000" };
-        var budgets = new List<Budget>
-        {
-            new()
-            {
-                Id = 1,
-                UserId = _userId,
-                CategoryId = 1,
-                Amount = 500m,
-                Month = 2,
-                Year = 2025,
-                Category = category
-            }
-        };
-
-        _budgetRepositoryMock
-            .Setup(x => x.GetAllForUserAsync(_userId, null, null))
-            .ReturnsAsync(budgets);
-
-        // Setup transaction repository to return spent amount
-        var pagedTransactions = new PagedResult<Transaction>
-        {
-            Data = new List<Transaction>
-            {
-                new()
-                {
-                    Id = 1,
-                    Amount = 150m,
-                    TransactionType = TransactionType.Expense,
-                    CategoryId = 1
-                }
-            }
-        };
-
-        _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
-            .ReturnsAsync(pagedTransactions);
-
-        // Act
-        var result = await _sut.GetAllAsync(_userId, null, null);
-
-        // Assert
-        result.Should().HaveCount(1);
-        var budget = result.First();
-        budget.Amount.Should().Be(500m);
-        budget.Spent.Should().Be(150m);
-        budget.Remaining.Should().Be(350m);
-        budget.PercentageUsed.Should().Be(30m);
-        budget.Status.Should().Be(BudgetStatus.UnderBudget);
-    }
-
-    [Fact]
-    public async Task GetAllAsync_ShouldReturnEmptyList_WhenNoBudgets()
-    {
-        // Arrange
-        _budgetRepositoryMock
-            .Setup(x => x.GetAllForUserAsync(_userId, null, null))
-            .ReturnsAsync(new List<Budget>());
-
-        // Act
-        var result = await _sut.GetAllAsync(_userId, null, null);
-
-        // Assert
-        result.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task GetAllAsync_ShouldFilterByMonthAndYear()
-    {
-        // Arrange
-        var category = new Category { Id = 1, Name = "Food" };
-        var budgets = new List<Budget>
-        {
-            new()
-            {
-                Id = 1,
-                UserId = _userId,
-                CategoryId = 1,
-                Amount = 500m,
-                Month = 2,
-                Year = 2025,
-                Category = category
-            }
-        };
-
-        _budgetRepositoryMock
-            .Setup(x => x.GetAllForUserAsync(_userId, 2, 2025))
-            .ReturnsAsync(budgets);
-
-        _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
-
-        // Act
-        var result = await _sut.GetAllAsync(_userId, 2, 2025);
-
-        // Assert
-        result.Should().HaveCount(1);
-        _budgetRepositoryMock.Verify(x => x.GetAllForUserAsync(_userId, 2, 2025), Times.Once);
-    }
-
-    #endregion
-
-    #region GetByIdAsync Tests
-
-    [Fact]
-    public async Task GetByIdAsync_ShouldReturnBudget_WhenExists()
-    {
-        // Arrange
-        var category = new Category { Id = 1, Name = "Food", Icon = "🍔" };
-        var budget = new Budget
-        {
-            Id = 1,
-            UserId = _userId,
-            CategoryId = 1,
-            Amount = 500m,
-            Month = 2,
-            Year = 2025,
-            Category = category
-        };
-
-        _budgetRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
-            .ReturnsAsync(budget);
-
-        _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
-
-        // Act
-        var result = await _sut.GetByIdAsync(1, _userId);
-
-        // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().Be(1);
-        result.Amount.Should().Be(500m);
-        result.CategoryName.Should().Be("Food");
-        result.Period.Should().Be("February 2025");
-    }
-
-    [Fact]
-    public async Task GetByIdAsync_ShouldThrowNotFoundException_WhenBudgetDoesNotExist()
-    {
-        // Arrange
-        _budgetRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
-            .ReturnsAsync((Budget?)null);
-
-        // Act
-        Func<Task> act = async () => await _sut.GetByIdAsync(999, _userId);
-
-        // Assert
-        await act.Should().ThrowAsync<NotFoundException>()
-            .WithMessage("Budget with identifier '999' was not found.");
-    }
-
-    #endregion
 
     #region GetSummaryAsync Tests
 
@@ -238,12 +74,13 @@ public class BudgetServiceTests
         };
 
         _budgetRepositoryMock
-            .Setup(x => x.GetByMonthYearAsync(_userId, 2, 2025))
+            .Setup(x => x.GetByMonthYearAsync(_userId, 2, 2025, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budgets);
 
         // Setup different spending for each category
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.Is<TransactionQueryParameters>(p => p.CategoryId == 1)))
+            .Setup(x => x.GetPagedAsync(_userId, It.Is<TransactionQueryParameters>(p => p.CategoryId == 1),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction>
             {
                 Data = new List<Transaction>
@@ -253,7 +90,8 @@ public class BudgetServiceTests
             });
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.Is<TransactionQueryParameters>(p => p.CategoryId == 2)))
+            .Setup(x => x.GetPagedAsync(_userId, It.Is<TransactionQueryParameters>(p => p.CategoryId == 2),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction>
             {
                 Data = new List<Transaction>
@@ -275,6 +113,171 @@ public class BudgetServiceTests
         result.TotalBudgets.Should().Be(2);
         result.BudgetsApproaching.Should().Be(1);
         result.BudgetsExceeded.Should().Be(1);
+    }
+
+    #endregion
+
+    #region GetAllAsync Tests
+
+    [Fact]
+    public async Task GetAllAsync_ShouldReturnBudgets_WithCalculatedSpending()
+    {
+        // Arrange
+        var category = new Category { Id = 1, Name = "Food", Icon = "🍔", Color = "#FF0000" };
+        var budgets = new List<Budget>
+        {
+            new()
+            {
+                Id = 1,
+                UserId = _userId,
+                CategoryId = 1,
+                Amount = 500m,
+                Month = 2,
+                Year = 2025,
+                Category = category
+            }
+        };
+
+        _budgetRepositoryMock
+            .Setup(x => x.GetAllForUserAsync(_userId, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(budgets);
+
+        // Setup transaction repository to return spent amount
+        var pagedTransactions = new PagedResult<Transaction>
+        {
+            Data = new List<Transaction>
+            {
+                new()
+                {
+                    Id = 1,
+                    Amount = 150m,
+                    TransactionType = TransactionType.Expense,
+                    CategoryId = 1
+                }
+            }
+        };
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(pagedTransactions);
+
+        // Act
+        var result = await _sut.GetAllAsync(_userId, null, null);
+
+        // Assert
+        result.Should().HaveCount(1);
+        var budget = result.First();
+        budget.Amount.Should().Be(500m);
+        budget.Spent.Should().Be(150m);
+        budget.Remaining.Should().Be(350m);
+        budget.PercentageUsed.Should().Be(30m);
+        budget.Status.Should().Be(BudgetStatus.UnderBudget);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ShouldReturnEmptyList_WhenNoBudgets()
+    {
+        // Arrange
+        _budgetRepositoryMock
+            .Setup(x => x.GetAllForUserAsync(_userId, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Budget>());
+
+        // Act
+        var result = await _sut.GetAllAsync(_userId, null, null);
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ShouldFilterByMonthAndYear()
+    {
+        // Arrange
+        var category = new Category { Id = 1, Name = "Food" };
+        var budgets = new List<Budget>
+        {
+            new()
+            {
+                Id = 1,
+                UserId = _userId,
+                CategoryId = 1,
+                Amount = 500m,
+                Month = 2,
+                Year = 2025,
+                Category = category
+            }
+        };
+
+        _budgetRepositoryMock
+            .Setup(x => x.GetAllForUserAsync(_userId, 2, 2025, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(budgets);
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
+
+        // Act
+        var result = await _sut.GetAllAsync(_userId, 2, 2025);
+
+        // Assert
+        result.Should().HaveCount(1);
+        _budgetRepositoryMock.Verify(x => x.GetAllForUserAsync(_userId, 2, 2025, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    #endregion
+
+    #region GetByIdAsync Tests
+
+    [Fact]
+    public async Task GetByIdAsync_ShouldReturnBudget_WhenExists()
+    {
+        // Arrange
+        var category = new Category { Id = 1, Name = "Food", Icon = "🍔" };
+        var budget = new Budget
+        {
+            Id = 1,
+            UserId = _userId,
+            CategoryId = 1,
+            Amount = 500m,
+            Month = 2,
+            Year = 2025,
+            Category = category
+        };
+
+        _budgetRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(budget);
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
+
+        // Act
+        var result = await _sut.GetByIdAsync(1, _userId);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Id.Should().Be(1);
+        result.Amount.Should().Be(500m);
+        result.CategoryName.Should().Be("Food");
+        result.Period.Should().Be("February 2025");
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ShouldThrowNotFoundException_WhenBudgetDoesNotExist()
+    {
+        // Arrange
+        _budgetRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Budget?)null);
+
+        // Act
+        Func<Task> act = async () => await _sut.GetByIdAsync(999, _userId);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Budget with identifier '999' was not found.");
     }
 
     #endregion
@@ -302,20 +305,20 @@ public class BudgetServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         _budgetRepositoryMock
-            .Setup(x => x.BudgetExistsAsync(_userId, 1, 3, 2025, null))
+            .Setup(x => x.BudgetExistsAsync(_userId, 1, 3, 2025, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
         _budgetRepositoryMock
-            .Setup(x => x.AddAsync(It.IsAny<Budget>()))
-            .ReturnsAsync((Budget b) => b);
+            .Setup(x => x.AddAsync(It.IsAny<Budget>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Budget b, CancellationToken cancellationToken) => b);
 
         _budgetRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(It.IsAny<int>(), _userId))
-            .ReturnsAsync((int id, Guid userId) => new Budget
+            .Setup(x => x.GetByIdForUserAsync(It.IsAny<int>(), _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int id, Guid userId, CancellationToken ct) => new Budget
             {
                 Id = 1,
                 UserId = userId,
@@ -327,7 +330,7 @@ public class BudgetServiceTests
             });
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
 
         // Act
@@ -346,9 +349,9 @@ public class BudgetServiceTests
             b.Amount == dto.Amount &&
             b.Month == dto.Month &&
             b.Year == dto.Year
-        )), Times.Once);
+        ), It.IsAny<CancellationToken>()), Times.Once);
 
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -364,7 +367,7 @@ public class BudgetServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Category?)null);
 
         // Act
@@ -374,7 +377,7 @@ public class BudgetServiceTests
         await act.Should().ThrowAsync<NotFoundException>()
             .WithMessage("Category with identifier '999' was not found.");
 
-        _budgetRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Budget>()), Times.Never);
+        _budgetRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Budget>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -392,11 +395,17 @@ public class BudgetServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         _budgetRepositoryMock
-            .Setup(x => x.BudgetExistsAsync(_userId, 1, 3, 2025, null))
+            .Setup(x => x.BudgetExistsAsync(
+                _userId,
+                1,
+                3,
+                2025,
+                It.IsAny<int?>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(true); // Budget already exists
 
         // Act
@@ -406,7 +415,7 @@ public class BudgetServiceTests
         await act.Should().ThrowAsync<ConflictException>()
             .WithMessage("Budget already exists for Food in March 2025");
 
-        _budgetRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Budget>()), Times.Never);
+        _budgetRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Budget>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -424,11 +433,17 @@ public class BudgetServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         _budgetRepositoryMock
-            .Setup(x => x.BudgetExistsAsync(_userId, 1, 1, 2025, null))
+            .Setup(x => x.BudgetExistsAsync(
+                _userId,
+                1,
+                3,
+                2025,
+                It.IsAny<int?>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
         // Act
@@ -438,7 +453,7 @@ public class BudgetServiceTests
         await act.Should().ThrowAsync<ValidationException>()
             .WithMessage("Cannot create budget for past months");
 
-        _budgetRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Budget>()), Times.Never);
+        _budgetRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Budget>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion
@@ -467,11 +482,11 @@ public class BudgetServiceTests
         };
 
         _budgetRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingBudget);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
 
         // Act
@@ -484,9 +499,9 @@ public class BudgetServiceTests
         _budgetRepositoryMock.Verify(x => x.UpdateAsync(It.Is<Budget>(b =>
             b.Id == 1 &&
             b.Amount == 600m
-        )), Times.Once);
+        ), It.IsAny<CancellationToken>()), Times.Once);
 
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -496,7 +511,7 @@ public class BudgetServiceTests
         var dto = new BudgetUpdateDto { Amount = 600m };
 
         _budgetRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Budget?)null);
 
         // Act
@@ -504,7 +519,7 @@ public class BudgetServiceTests
 
         // Assert
         await act.Should().ThrowAsync<NotFoundException>();
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Never);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion
@@ -526,15 +541,15 @@ public class BudgetServiceTests
         };
 
         _budgetRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budget);
 
         // Act
         await _sut.DeleteAsync(1, _userId);
 
         // Assert
-        _budgetRepositoryMock.Verify(x => x.DeleteAsync(1), Times.Once);
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _budgetRepositoryMock.Verify(x => x.DeleteAsync(1, It.IsAny<CancellationToken>()), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -542,15 +557,15 @@ public class BudgetServiceTests
     {
         // Arrange
         _budgetRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Budget?)null);
 
         // Act
-        Func<Task> act = async () => await _sut.DeleteAsync(999, _userId);
+        var act = async () => await _sut.DeleteAsync(999, _userId);
 
         // Assert
         await act.Should().ThrowAsync<NotFoundException>();
-        _budgetRepositoryMock.Verify(x => x.DeleteAsync(It.IsAny<int>()), Times.Never);
+        _budgetRepositoryMock.Verify(x => x.DeleteAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion
@@ -574,12 +589,12 @@ public class BudgetServiceTests
         };
 
         _budgetRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budget);
 
         // 85% spent
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction>
             {
                 Data = new List<Transaction>
@@ -614,12 +629,12 @@ public class BudgetServiceTests
         };
 
         _budgetRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budget);
 
         // 120% spent (exceeded)
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction>
             {
                 Data = new List<Transaction>
@@ -655,12 +670,12 @@ public class BudgetServiceTests
         };
 
         _budgetRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budget);
 
         // 30% spent
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
+            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResult<Transaction>
             {
                 Data = new List<Transaction>

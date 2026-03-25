@@ -5,21 +5,20 @@ using SmartExpense.Application.Interfaces;
 using SmartExpense.Core.Entities;
 using SmartExpense.Core.Enums;
 using SmartExpense.Core.Exceptions;
-using SmartExpense.Core.Models;
 using SmartExpense.Infrastructure.Services;
 
 namespace SmartExpense.Tests.Services;
 
 public class RecurringTransactionServiceTests
 {
-    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
-    private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
-    private readonly Mock<IRecurringTransactionRepository> _recurringRepositoryMock;
     private readonly Mock<ICategoryRepository> _categoryRepositoryMock;
-    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
-    private readonly RecurringTransactionService _sut;
-    private readonly Guid _userId;
+    private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
     private readonly DateTime _now;
+    private readonly Mock<IRecurringTransactionRepository> _recurringRepositoryMock;
+    private readonly RecurringTransactionService _sut;
+    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Guid _userId;
 
     public RecurringTransactionServiceTests()
     {
@@ -39,6 +38,68 @@ public class RecurringTransactionServiceTests
 
         _sut = new RecurringTransactionService(_unitOfWorkMock.Object, _dateTimeProviderMock.Object);
     }
+
+    #region GenerateTransactionsAsync Tests
+
+    [Fact]
+    public async Task GenerateTransactionsAsync_ShouldNotGenerateDuplicates()
+    {
+        // Arrange
+        var category = new Category { Id = 1, Name = "Rent" };
+        var recurring = new RecurringTransaction
+        {
+            Id = 1,
+            UserId = _userId,
+            CategoryId = 1,
+            Description = "Monthly Rent",
+            Amount = 1500m,
+            Frequency = RecurrenceFrequency.Monthly,
+            StartDate = new DateTime(2025, 2, 1),
+            LastGeneratedDate = new DateTime(2025, 1, 1),
+            IsActive = true,
+            Category = category
+        };
+
+        _recurringRepositoryMock
+            .Setup(x => x.GetAllForUserAsync(_userId, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RecurringTransaction> { recurring });
+
+        // FK-based dedup: returns true to signal the transaction already exists
+        _transactionRepositoryMock
+            .Setup(x => x.ExistsForRecurringOnDateAsync(recurring.Id, It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _sut.GenerateTransactionsAsync(_userId);
+
+        // Assert
+        result.TransactionsGenerated.Should().Be(0); // No new transactions generated
+        _transactionRepositoryMock.Verify(
+            x => x.ExistsForRecurringOnDateAsync(recurring.Id, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce);
+    }
+
+    #endregion
+
+    #region GenerateForRecurringTransactionAsync Tests
+
+    [Fact]
+    public async Task GenerateForRecurringTransactionAsync_ShouldThrowNotFoundException_WhenDoesNotExist()
+    {
+        // Arrange
+        _recurringRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RecurringTransaction?)null);
+
+        // Act
+        Func<Task> act = async () => await _sut.GenerateForRecurringTransactionAsync(999, _userId);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>();
+    }
+
+    #endregion
 
     #region GetAllAsync Tests
 
@@ -64,11 +125,11 @@ public class RecurringTransactionServiceTests
         };
 
         _recurringRepositoryMock
-            .Setup(x => x.GetAllForUserAsync(_userId, null))
+            .Setup(x => x.GetAllForUserAsync(_userId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(recurring);
 
         // Act
-        var result = await _sut.GetAllAsync(_userId, null);
+        var result = await _sut.GetAllAsync(_userId);
 
         // Assert
         result.Should().HaveCount(1);
@@ -96,16 +157,17 @@ public class RecurringTransactionServiceTests
         };
 
         _recurringRepositoryMock
-            .Setup(x => x.GetAllForUserAsync(_userId, true))
+            .Setup(x => x.GetAllForUserAsync(_userId, true, It.IsAny<CancellationToken>()))
             .ReturnsAsync(recurring);
 
         // Act
-        var result = await _sut.GetAllAsync(_userId, isActive: true);
+        var result = await _sut.GetAllAsync(_userId, true);
 
         // Assert
         result.Should().HaveCount(1);
         result.First().IsActive.Should().BeTrue();
-        _recurringRepositoryMock.Verify(x => x.GetAllForUserAsync(_userId, true), Times.Once);
+        _recurringRepositoryMock.Verify(x => x.GetAllForUserAsync(_userId, true, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     #endregion
@@ -131,7 +193,7 @@ public class RecurringTransactionServiceTests
         };
 
         _recurringRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(recurring);
 
         // Act
@@ -149,7 +211,7 @@ public class RecurringTransactionServiceTests
     {
         // Arrange
         _recurringRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((RecurringTransaction?)null);
 
         // Act
@@ -188,16 +250,16 @@ public class RecurringTransactionServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         _recurringRepositoryMock
-            .Setup(x => x.AddAsync(It.IsAny<RecurringTransaction>()))
-            .ReturnsAsync((RecurringTransaction r) => r);
+            .Setup(x => x.AddAsync(It.IsAny<RecurringTransaction>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RecurringTransaction r,CancellationToken ct) => r);
 
         _recurringRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(It.IsAny<int>(), _userId))
-            .ReturnsAsync((int id, Guid userId) => new RecurringTransaction
+            .Setup(x => x.GetByIdForUserAsync(It.IsAny<int>(), _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int id, Guid userId,CancellationToken ct) => new RecurringTransaction
             {
                 Id = 1,
                 UserId = userId,
@@ -226,9 +288,9 @@ public class RecurringTransactionServiceTests
             r.CategoryId == dto.CategoryId &&
             r.Description == dto.Description &&
             r.IsActive == true
-        )), Times.Once);
+        ), It.IsAny<CancellationToken>()), Times.Once);
 
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -246,7 +308,7 @@ public class RecurringTransactionServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Category?)null);
 
         // Act
@@ -254,7 +316,8 @@ public class RecurringTransactionServiceTests
 
         // Assert
         await act.Should().ThrowAsync<NotFoundException>();
-        _recurringRepositoryMock.Verify(x => x.AddAsync(It.IsAny<RecurringTransaction>()), Times.Never);
+        _recurringRepositoryMock.Verify(
+            x => x.AddAsync(It.IsAny<RecurringTransaction>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -280,7 +343,7 @@ public class RecurringTransactionServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         // Act
@@ -309,7 +372,7 @@ public class RecurringTransactionServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         // Act
@@ -350,11 +413,11 @@ public class RecurringTransactionServiceTests
         };
 
         _recurringRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         // Act
@@ -369,7 +432,7 @@ public class RecurringTransactionServiceTests
             r.Id == 1 &&
             r.Description == dto.Description &&
             r.Amount == dto.Amount
-        )), Times.Once);
+        ), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -386,7 +449,7 @@ public class RecurringTransactionServiceTests
         };
 
         _recurringRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((RecurringTransaction?)null);
 
         // Act
@@ -414,15 +477,15 @@ public class RecurringTransactionServiceTests
         };
 
         _recurringRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(recurring);
 
         // Act
         await _sut.DeleteAsync(1, _userId);
 
         // Assert
-        _recurringRepositoryMock.Verify(x => x.DeleteAsync(1), Times.Once);
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _recurringRepositoryMock.Verify(x => x.DeleteAsync(1, It.IsAny<CancellationToken>()), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -430,15 +493,16 @@ public class RecurringTransactionServiceTests
     {
         // Arrange
         _recurringRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((RecurringTransaction?)null);
 
         // Act
-        Func<Task> act = async () => await _sut.DeleteAsync(999, _userId);
+        var act = async () => await _sut.DeleteAsync(999, _userId);
 
         // Assert
         await act.Should().ThrowAsync<NotFoundException>();
-        _recurringRepositoryMock.Verify(x => x.DeleteAsync(It.IsAny<int>()), Times.Never);
+        _recurringRepositoryMock.Verify(x => x.DeleteAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     #endregion
@@ -460,7 +524,7 @@ public class RecurringTransactionServiceTests
         };
 
         _recurringRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(recurring);
 
         // Act
@@ -471,7 +535,7 @@ public class RecurringTransactionServiceTests
         _recurringRepositoryMock.Verify(x => x.UpdateAsync(It.Is<RecurringTransaction>(r =>
             r.Id == 1 &&
             r.IsActive == false
-        )), Times.Once);
+        ), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -489,7 +553,7 @@ public class RecurringTransactionServiceTests
         };
 
         _recurringRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(recurring);
 
         // Act
@@ -497,67 +561,6 @@ public class RecurringTransactionServiceTests
 
         // Assert
         result.IsActive.Should().BeTrue();
-    }
-
-    #endregion
-
-    #region GenerateTransactionsAsync Tests
-
-    [Fact]
-    public async Task GenerateTransactionsAsync_ShouldNotGenerateDuplicates()
-    {
-        // Arrange
-        var category = new Category { Id = 1, Name = "Rent" };
-        var recurring = new RecurringTransaction
-        {
-            Id = 1,
-            UserId = _userId,
-            CategoryId = 1,
-            Description = "Monthly Rent",
-            Amount = 1500m,
-            Frequency = RecurrenceFrequency.Monthly,
-            StartDate = new DateTime(2025, 2, 1),
-            LastGeneratedDate = new DateTime(2025, 2, 1),
-            IsActive = true,
-            Category = category
-        };
-
-        _recurringRepositoryMock
-            .Setup(x => x.GetAllForUserAsync(_userId, true))
-            .ReturnsAsync(new List<RecurringTransaction> { recurring });
-
-        // FK-based dedup: returns true to signal the transaction already exists
-        _transactionRepositoryMock
-            .Setup(x => x.ExistsForRecurringOnDateAsync(recurring.Id, It.IsAny<DateTime>()))
-            .ReturnsAsync(true);
-
-        // Act
-        var result = await _sut.GenerateTransactionsAsync(_userId);
-
-        // Assert
-        result.TransactionsGenerated.Should().Be(0); // No new transactions generated
-        _transactionRepositoryMock.Verify(
-            x => x.ExistsForRecurringOnDateAsync(recurring.Id, It.IsAny<DateTime>()),
-            Times.AtLeastOnce);
-    }
-
-    #endregion
-
-    #region GenerateForRecurringTransactionAsync Tests
-
-    [Fact]
-    public async Task GenerateForRecurringTransactionAsync_ShouldThrowNotFoundException_WhenDoesNotExist()
-    {
-        // Arrange
-        _recurringRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
-            .ReturnsAsync((RecurringTransaction?)null);
-
-        // Act
-        Func<Task> act = async () => await _sut.GenerateForRecurringTransactionAsync(999, _userId);
-
-        // Assert
-        await act.Should().ThrowAsync<NotFoundException>();
     }
 
     #endregion

@@ -8,7 +8,7 @@ public class MonthlyComparisonDto
     public decimal TotalIncome { get; set; }
     public decimal TotalExpense { get; set; }
     public decimal NetBalance { get; set; }
-    public decimal IncomeChange { get; set; } 
-    public decimal ExpenseChange { get; set; } 
+    public decimal IncomeChange { get; set; }
+    public decimal ExpenseChange { get; set; }
     public int TransactionCount { get; set; }
-}   
+}

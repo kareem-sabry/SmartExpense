@@ -9,15 +9,15 @@ namespace SmartExpense.Tests.Repositories;
 
 public class RecurringTransactionRepositoryTests : IDisposable
 {
+    private readonly Category _category;
     private readonly AppDbContext _context;
     private readonly RecurringTransactionRepository _sut;
     private readonly Guid _userId;
-    private readonly Category _category;
 
     public RecurringTransactionRepositoryTests()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
         _context = new AppDbContext(options);
@@ -36,6 +36,12 @@ public class RecurringTransactionRepositoryTests : IDisposable
 
         _context.Categories.Add(_category);
         _context.SaveChanges();
+    }
+
+    public void Dispose()
+    {
+        _context.Database.EnsureDeleted();
+        _context.Dispose();
     }
 
     [Fact]
@@ -114,7 +120,7 @@ public class RecurringTransactionRepositoryTests : IDisposable
         await _context.SaveChangesAsync();
 
         // Act
-        var result = await _sut.GetAllForUserAsync(_userId, isActive: true);
+        var result = await _sut.GetAllForUserAsync(_userId, true);
 
         // Assert
         result.Should().HaveCount(1);
@@ -205,11 +211,5 @@ public class RecurringTransactionRepositoryTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result!.Description.Should().Be("Test");
-    }
-
-    public void Dispose()
-    {
-        _context.Database.EnsureDeleted();
-        _context.Dispose();
     }
 }

@@ -52,11 +52,11 @@ public class RecurringTransactionControllerTests
         };
 
         _recurringServiceMock
-            .Setup(x => x.GetAllAsync(_userId, null))
+            .Setup(x => x.GetAllAsync(_userId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(recurring);
 
         // Act
-        var result = await _sut.GetAll(null);
+        var result = await _sut.GetAll();
 
         // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
@@ -77,7 +77,7 @@ public class RecurringTransactionControllerTests
         };
 
         _recurringServiceMock
-            .Setup(x => x.GetByIdAsync(1, _userId))
+            .Setup(x => x.GetByIdAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(recurring);
 
         // Act
@@ -110,7 +110,7 @@ public class RecurringTransactionControllerTests
         };
 
         _recurringServiceMock
-            .Setup(x => x.CreateAsync(dto, _userId))
+            .Setup(x => x.CreateAsync(dto, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(created);
 
         // Act
@@ -133,7 +133,7 @@ public class RecurringTransactionControllerTests
         };
 
         _recurringServiceMock
-            .Setup(x => x.ToggleActiveAsync(1, _userId))
+            .Setup(x => x.ToggleActiveAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(toggled);
 
         // Act
@@ -159,7 +159,7 @@ public class RecurringTransactionControllerTests
         };
 
         _recurringServiceMock
-            .Setup(x => x.GenerateTransactionsAsync(_userId))
+            .Setup(x => x.GenerateTransactionsAsync(_userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(generateResult);
 
         // Act
@@ -176,7 +176,7 @@ public class RecurringTransactionControllerTests
     {
         // Arrange
         _recurringServiceMock
-            .Setup(x => x.DeleteAsync(1, _userId))
+            .Setup(x => x.DeleteAsync(1, _userId, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act

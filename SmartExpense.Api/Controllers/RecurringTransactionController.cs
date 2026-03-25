@@ -41,7 +41,7 @@ public class RecurringTransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var recurring = await _recurringTransactionService.GetAllAsync(userId, isActive);
+        var recurring = await _recurringTransactionService.GetAllAsync(userId, isActive, cancellationToken);
         return Ok(recurring);
     }
 
@@ -62,7 +62,7 @@ public class RecurringTransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var recurring = await _recurringTransactionService.GetByIdAsync(id, userId);
+        var recurring = await _recurringTransactionService.GetByIdAsync(id, userId, cancellationToken);
         return Ok(recurring);
     }
 
@@ -87,7 +87,7 @@ public class RecurringTransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var recurring = await _recurringTransactionService.CreateAsync(dto, userId);
+        var recurring = await _recurringTransactionService.CreateAsync(dto, userId, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = recurring.Id }, recurring);
     }
 
@@ -113,7 +113,7 @@ public class RecurringTransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var recurring = await _recurringTransactionService.UpdateAsync(id, dto, userId);
+        var recurring = await _recurringTransactionService.UpdateAsync(id, dto, userId, cancellationToken);
         return Ok(recurring);
     }
 
@@ -135,7 +135,7 @@ public class RecurringTransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        await _recurringTransactionService.DeleteAsync(id, userId);
+        await _recurringTransactionService.DeleteAsync(id, userId, cancellationToken);
         return NoContent();
     }
 
@@ -157,7 +157,7 @@ public class RecurringTransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var recurring = await _recurringTransactionService.ToggleActiveAsync(id, userId);
+        var recurring = await _recurringTransactionService.ToggleActiveAsync(id, userId, cancellationToken);
         return Ok(recurring);
     }
 
@@ -177,7 +177,7 @@ public class RecurringTransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var result = await _recurringTransactionService.GenerateTransactionsAsync(userId);
+        var result = await _recurringTransactionService.GenerateTransactionsAsync(userId, cancellationToken);
         return Ok(result);
     }
 
@@ -199,7 +199,8 @@ public class RecurringTransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var result = await _recurringTransactionService.GenerateForRecurringTransactionAsync(id, userId);
+        var result =
+            await _recurringTransactionService.GenerateForRecurringTransactionAsync(id, userId, cancellationToken);
         return Ok(result);
     }
 }

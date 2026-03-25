@@ -55,7 +55,7 @@ public class BudgetControllerTests
         };
 
         _budgetServiceMock
-            .Setup(x => x.GetAllAsync(_userId, null, null))
+            .Setup(x => x.GetAllAsync(_userId, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budgets);
 
         // Act
@@ -85,7 +85,7 @@ public class BudgetControllerTests
         };
 
         _budgetServiceMock
-            .Setup(x => x.GetByIdAsync(1, _userId))
+            .Setup(x => x.GetByIdAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budget);
 
         // Act
@@ -117,7 +117,7 @@ public class BudgetControllerTests
         };
 
         _budgetServiceMock
-            .Setup(x => x.GetSummaryAsync(_userId, 2, 2025))
+            .Setup(x => x.GetSummaryAsync(_userId, 2, 2025, It.IsAny<CancellationToken>()))
             .ReturnsAsync(summary);
 
         // Act
@@ -152,7 +152,7 @@ public class BudgetControllerTests
         };
 
         _budgetServiceMock
-            .Setup(x => x.CreateAsync(dto, _userId))
+            .Setup(x => x.CreateAsync(dto, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(created);
 
         // Act
@@ -169,7 +169,7 @@ public class BudgetControllerTests
     {
         // Arrange
         _budgetServiceMock
-            .Setup(x => x.DeleteAsync(1, _userId))
+            .Setup(x => x.DeleteAsync(1, _userId, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -177,7 +177,7 @@ public class BudgetControllerTests
 
         // Assert
         result.Should().BeOfType<NoContentResult>();
-        _budgetServiceMock.Verify(x => x.DeleteAsync(1, _userId), Times.Once);
+        _budgetServiceMock.Verify(x => x.DeleteAsync(1, _userId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]
@@ -191,7 +191,8 @@ public class BudgetControllerTests
 
         // Assert
         result.Result.Should().BeOfType<BadRequestObjectResult>();
-        _budgetServiceMock.Verify(x => x.GetSummaryAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>()),
+        _budgetServiceMock.Verify(
+            x => x.GetSummaryAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

@@ -5,8 +5,6 @@ namespace SmartExpense.Core.Entities;
 
 public class RecurringTransaction : IAuditable, IEntity, IUserOwnedEntity
 {
-    public int Id { get; set; }
-    public Guid UserId { get; set; }
     public int CategoryId { get; set; }
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
@@ -20,11 +18,13 @@ public class RecurringTransaction : IAuditable, IEntity, IUserOwnedEntity
     public bool IsActive { get; set; } = true;
     public string? Notes { get; set; }
 
+    public User User { get; set; } = null!;
+    public Category Category { get; set; } = null!;
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? UpdatedAtUtc { get; set; }
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
-
-    public User User { get; set; } = null!;
-    public Category Category { get; set; } = null!;
+    public int Id { get; set; }
+    public Guid UserId { get; set; }
 }
