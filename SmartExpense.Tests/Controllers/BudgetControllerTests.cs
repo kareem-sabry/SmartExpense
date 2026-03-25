@@ -179,4 +179,19 @@ public class BudgetControllerTests
         result.Should().BeOfType<NoContentResult>();
         _budgetServiceMock.Verify(x => x.DeleteAsync(1, _userId), Times.Once);
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(13)]
+    [InlineData(-1)]
+    public async Task GetSummary_ShouldReturnBadRequest_WhenMonthIsInvalid(int invalidMonth)
+    {
+        // Act
+        var result = await _sut.GetSummary(invalidMonth, 2025);
+
+        // Assert
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        _budgetServiceMock.Verify(x => x.GetSummaryAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>()),
+            Times.Never);
+    }
 }
