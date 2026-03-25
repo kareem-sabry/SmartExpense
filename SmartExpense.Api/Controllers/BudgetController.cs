@@ -2,6 +2,7 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SmartExpense.Application.Dtos.Auth;
 using SmartExpense.Application.Dtos.Budget;
 using SmartExpense.Application.Interfaces;
 using SmartExpense.Core.Constants;
@@ -38,6 +39,12 @@ public class BudgetController : ControllerBase
         [FromQuery] int? year,
         CancellationToken cancellationToken = default)
     {
+        if (month < 1 || month > 12)
+            return BadRequest(new BasicResponse
+            {
+                Succeeded = false,
+                Message = "Month must be between 1 and 12."
+            });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var budgets = await _budgetService.GetAllAsync(userId, month, year);
         return Ok(budgets);
@@ -81,6 +88,12 @@ public class BudgetController : ControllerBase
         [FromQuery] int year,
         CancellationToken cancellationToken = default)
     {
+        if (month < 1 || month > 12)
+            return BadRequest(new BasicResponse
+            {
+                Succeeded = false,
+                Message = "Month must be between 1 and 12."
+            });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var summary = await _budgetService.GetSummaryAsync(userId, month, year);
         return Ok(summary);
