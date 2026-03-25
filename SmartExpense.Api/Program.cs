@@ -1,14 +1,8 @@
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Asp.Versioning;
-using SmartExpense.Application.Interfaces;
-using SmartExpense.Core.Constants;
-using SmartExpense.Core.Entities;
-using SmartExpense.Core.Models;
-using SmartExpense.Infrastructure.Data;
-using SmartExpense.Infrastructure.Repositories;
-using SmartExpense.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
@@ -18,7 +12,14 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SmartExpense.Api.Middlewares;
 using SmartExpense.Application.Dtos.Auth;
+using SmartExpense.Application.Interfaces;
+using SmartExpense.Core.Constants;
+using SmartExpense.Core.Entities;
+using SmartExpense.Core.Models;
+using SmartExpense.Infrastructure.Data;
 using SmartExpense.Infrastructure.Interceptors;
+using SmartExpense.Infrastructure.Repositories;
+using SmartExpense.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -54,9 +55,9 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
-    options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
     options.JsonSerializerOptions.DefaultIgnoreCondition =
-        System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        JsonIgnoreCondition.WhenWritingNull;
 }).AddNewtonsoftJson();
 
 //====================================
@@ -68,10 +69,10 @@ builder.Services.AddRateLimiter(options =>
     // Global rate limit
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: context.User.Identity?.Name
-                          ?? context.Connection.RemoteIpAddress?.ToString()
-                          ?? "unknown",
-            factory: partition => new FixedWindowRateLimiterOptions
+            context.User.Identity?.Name
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown",
+            partition => new FixedWindowRateLimiterOptions
             {
                 AutoReplenishment = true,
                 PermitLimit = 100,
@@ -102,7 +103,7 @@ builder.Services.AddRateLimiter(options =>
         {
             Succeeded = false,
             Message = "Too many requests. Please try again later."
-        }, cancellationToken: token);
+        }, token);
     };
 });
 
@@ -172,9 +173,7 @@ builder.Services.AddAuthentication(opt =>
             $"JWT configuration is missing. Please configure '{JwtOptions.JwtOptionsKey}' section.");
 
     if (string.IsNullOrEmpty(jwtOptions.Secret) || jwtOptions.Secret.Length < 32)
-    {
         throw new ArgumentException("JWT Secret must be at least 32 characters long.");
-    }
 
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -298,7 +297,7 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
-builder.Services.AddScoped<IRecurringTransactionService, RecurringTransactionService>(); 
+builder.Services.AddScoped<IRecurringTransactionService, RecurringTransactionService>();
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<IAdminService, AdminService>();

@@ -6,8 +6,8 @@ namespace SmartExpense.Api.Middlewares;
 
 public class GlobalExceptionHandler : IExceptionHandler
 {
-    private readonly ILogger<GlobalExceptionHandler> _logger;
     private readonly IHostEnvironment _environment;
+    private readonly ILogger<GlobalExceptionHandler> _logger;
 
     public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IHostEnvironment environment)
     {
@@ -74,9 +74,7 @@ public class GlobalExceptionHandler : IExceptionHandler
 
         //stack trace is only included in development
         if (_environment.IsDevelopment() && statusCode == 500)
-        {
             problemDetails.Extensions["stackTrace"] = exception.StackTrace;
-        }
 
         return problemDetails;
     }
@@ -85,9 +83,7 @@ public class GlobalExceptionHandler : IExceptionHandler
     {
         // internal details are not exposed in production for 500 errors
         if (statusCode == 500 && !_environment.IsDevelopment())
-        {
             return "An unexpected error occurred. Please try again later.";
-        }
 
         return exception.Message;
     }
