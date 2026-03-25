@@ -6,7 +6,7 @@ public interface IUnitOfWork : IDisposable
     ITransactionRepository Transactions { get; }
     IBudgetRepository Budgets { get; }
     IRecurringTransactionRepository RecurringTransactions { get; }
-    Task<int> SaveChangesAsync();
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     Task BeginTransactionAsync();
     Task CommitTransactionAsync();
     Task RollbackTransactionAsync();
