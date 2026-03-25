@@ -20,6 +20,7 @@ using SmartExpense.Infrastructure.Data;
 using SmartExpense.Infrastructure.Interceptors;
 using SmartExpense.Infrastructure.Repositories;
 using SmartExpense.Infrastructure.Services;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -405,5 +406,31 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.MapHealthChecks("/health");
+// Detailed health check response — returns JSON with component statuses.
+// This endpoint is intentionally unauthenticated so load balancers and
+// container orchestrators (Docker, Kubernetes) can probe it without credentials.
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+
+        var result = new
+        {
+            status = report.Status.ToString(),
+            checkedAt = DateTime.UtcNow,
+            duration = report.TotalDuration,
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                duration = e.Value.Duration,
+                error = e.Value.Exception?.Message
+            })
+        };
+
+        await context.Response.WriteAsJsonAsync(result);
+    }
+});
 app.Run();
