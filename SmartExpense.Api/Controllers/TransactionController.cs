@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using System.Text;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,8 +25,8 @@ public class TransactionController : ControllerBase
     }
 
     /// <summary>
-    /// Returns a paginated list of transactions for the authenticated user.
-    /// Supports filtering by date range, type, and category via query parameters.
+    ///     Returns a paginated list of transactions for the authenticated user.
+    ///     Supports filtering by date range, type, and category via query parameters.
     /// </summary>
     /// <param name="parameters">Pagination and filter options (page, pageSize, startDate, endDate, type, categoryId).</param>
     /// <returns>A paged result containing transactions that match the given parameters.</returns>
@@ -35,7 +36,8 @@ public class TransactionController : ControllerBase
     [ProducesResponseType(typeof(PagedResult<TransactionReadDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<PagedResult<TransactionReadDto>>> GetTransactions(
-        [FromQuery] TransactionQueryParameters parameters)
+        [FromQuery] TransactionQueryParameters parameters,
+        CancellationToken cancellationToken)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var result = await _transactionService.GetPagedAsync(userId, parameters);
@@ -43,7 +45,7 @@ public class TransactionController : ControllerBase
     }
 
     /// <summary>
-    /// Returns a single transaction by its ID, scoped to the authenticated user.
+    ///     Returns a single transaction by its ID, scoped to the authenticated user.
     /// </summary>
     /// <param name="id">The unique identifier of the transaction.</param>
     /// <returns>The matching transaction.</returns>
@@ -54,7 +56,7 @@ public class TransactionController : ControllerBase
     [ProducesResponseType(typeof(TransactionReadDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<TransactionReadDto>> GetById(int id)
+    public async Task<ActionResult<TransactionReadDto>> GetById(int id, CancellationToken cancellationToken)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var transaction = await _transactionService.GetByIdAsync(id, userId);
@@ -62,8 +64,8 @@ public class TransactionController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the most recent transactions for the authenticated user, ordered by date descending.
-    /// Intended for dashboard widgets and quick-glance summaries.
+    ///     Returns the most recent transactions for the authenticated user, ordered by date descending.
+    ///     Intended for dashboard widgets and quick-glance summaries.
     /// </summary>
     /// <param name="count">Maximum number of transactions to return. Defaults to 10.</param>
     /// <returns>A list of the most recent transactions.</returns>
@@ -72,7 +74,9 @@ public class TransactionController : ControllerBase
     [HttpGet("recent")]
     [ProducesResponseType(typeof(List<TransactionReadDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<List<TransactionReadDto>>> GetRecent([FromQuery] int count = 10)
+    public async Task<ActionResult<List<TransactionReadDto>>> GetRecent(
+        [FromQuery] int count = 10,
+        CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var transactions = await _transactionService.GetRecentAsync(userId, count);
@@ -80,8 +84,8 @@ public class TransactionController : ControllerBase
     }
 
     /// <summary>
-    /// Returns an aggregated summary of the authenticated user's transactions within
-    /// an optional date range, including total income, total expenses, and net balance.
+    ///     Returns an aggregated summary of the authenticated user's transactions within
+    ///     an optional date range, including total income, total expenses, and net balance.
     /// </summary>
     /// <param name="startDate">Optional inclusive start of the date range.</param>
     /// <param name="endDate">Optional inclusive end of the date range.</param>
@@ -93,7 +97,8 @@ public class TransactionController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<TransactionSummaryDto>> GetSummary(
         [FromQuery] DateTime? startDate,
-        [FromQuery] DateTime? endDate)
+        [FromQuery] DateTime? endDate,
+        CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var summary = await _transactionService.GetSummaryAsync(userId, startDate, endDate);
@@ -101,16 +106,16 @@ public class TransactionController : ControllerBase
     }
 
     /// <summary>
-    /// Exports transactions for the authenticated user within the given date range
-    /// as a UTF-8 encoded CSV file. Useful for personal finance tracking and
-    /// importing into spreadsheet tools.
+    ///     Exports transactions for the authenticated user within the given date range
+    ///     as a UTF-8 encoded CSV file. Useful for personal finance tracking and
+    ///     importing into spreadsheet tools.
     /// </summary>
     /// <param name="startDate">Inclusive start date of the export window.</param>
     /// <param name="endDate">Inclusive end date of the export window.</param>
     /// <param name="cancellationToken">Token to cancel the request if the client disconnects.</param>
     /// <returns>
-    /// A CSV file named <c>transactions_{startDate}_{endDate}.csv</c> with columns:
-    /// Date, Description, Category, Type, Amount, Notes.
+    ///     A CSV file named <c>transactions_{startDate}_{endDate}.csv</c> with columns:
+    ///     Date, Description, Category, Type, Amount, Notes.
     /// </returns>
     /// <response code="200">CSV file generated and returned.</response>
     /// <response code="401">The request is missing or contains an invalid JWT.</response>
@@ -127,15 +132,15 @@ public class TransactionController : ControllerBase
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var csv = await _transactionService.ExportToCsvAsync(userId, startDate, endDate);
-        var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+        var bytes = Encoding.UTF8.GetBytes(csv);
         var filename = $"transactions_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}.csv";
         return File(bytes, "text/csv", filename);
     }
 
     /// <summary>
-    /// Creates a new transaction for the authenticated user.
-    /// The referenced category must belong to the user and be active.
-    /// Transaction dates in the future are rejected.
+    ///     Creates a new transaction for the authenticated user.
+    ///     The referenced category must belong to the user and be active.
+    ///     Transaction dates in the future are rejected.
     /// </summary>
     /// <param name="dto">The transaction data to persist.</param>
     /// <returns>The newly created transaction, including its generated ID and audit fields.</returns>
@@ -148,7 +153,9 @@ public class TransactionController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<TransactionReadDto>> Create(TransactionCreateDto dto)
+    public async Task<ActionResult<TransactionReadDto>> Create(
+        TransactionCreateDto dto,
+        CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var transaction = await _transactionService.CreateAsync(dto, userId);
@@ -156,9 +163,9 @@ public class TransactionController : ControllerBase
     }
 
     /// <summary>
-    /// Updates an existing transaction that belongs to the authenticated user.
-    /// The referenced category must belong to the user and be active.
-    /// Transaction dates in the future are rejected.
+    ///     Updates an existing transaction that belongs to the authenticated user.
+    ///     The referenced category must belong to the user and be active.
+    ///     Transaction dates in the future are rejected.
     /// </summary>
     /// <param name="id">The ID of the transaction to update.</param>
     /// <param name="dto">The updated transaction data.</param>
@@ -172,7 +179,10 @@ public class TransactionController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<TransactionReadDto>> Update(int id, TransactionUpdateDto dto)
+    public async Task<ActionResult<TransactionReadDto>> Update(
+        int id,
+        TransactionUpdateDto dto,
+        CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var transaction = await _transactionService.UpdateAsync(id, dto, userId);
@@ -180,8 +190,8 @@ public class TransactionController : ControllerBase
     }
 
     /// <summary>
-    /// Permanently deletes a transaction that belongs to the authenticated user.
-    /// This operation is irreversible.
+    ///     Permanently deletes a transaction that belongs to the authenticated user.
+    ///     This operation is irreversible.
     /// </summary>
     /// <param name="id">The ID of the transaction to delete.</param>
     /// <returns>No content on success.</returns>
@@ -192,7 +202,7 @@ public class TransactionController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         await _transactionService.DeleteAsync(id, userId);
