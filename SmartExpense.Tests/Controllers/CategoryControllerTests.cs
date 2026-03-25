@@ -47,7 +47,7 @@ public class CategoryControllerTests
         };
 
         _categoryServiceMock
-            .Setup(x => x.GetAllAsync(_userId))
+            .Setup(x => x.GetAllAsync(_userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(categories);
 
         // Act
@@ -71,7 +71,7 @@ public class CategoryControllerTests
         };
 
         _categoryServiceMock
-            .Setup(x => x.GetByIdAsync(1, _userId))
+            .Setup(x => x.GetByIdAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         // Act
@@ -101,7 +101,7 @@ public class CategoryControllerTests
         };
 
         _categoryServiceMock
-            .Setup(x => x.CreateAsync(dto, _userId))
+            .Setup(x => x.CreateAsync(dto, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(created);
 
         // Act
@@ -118,7 +118,7 @@ public class CategoryControllerTests
     {
         // Arrange
         _categoryServiceMock
-            .Setup(x => x.DeleteAsync(1, _userId))
+            .Setup(x => x.DeleteAsync(1, _userId, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -126,6 +126,6 @@ public class CategoryControllerTests
 
         // Assert
         result.Should().BeOfType<NoContentResult>();
-        _categoryServiceMock.Verify(x => x.DeleteAsync(1, _userId), Times.Once);
+        _categoryServiceMock.Verify(x => x.DeleteAsync(1, _userId, It.IsAny<CancellationToken>()), Times.Once);
     }
 }
