@@ -3,6 +3,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartExpense.Application.Dtos.Analytics;
+using SmartExpense.Application.Dtos.Auth;
 using SmartExpense.Application.Interfaces;
 using SmartExpense.Core.Constants;
 
@@ -39,6 +40,12 @@ public class AnalyticsController : ControllerBase
         [FromQuery] DateTime endDate,
         CancellationToken cancellationToken = default)
     {
+        if (startDate > endDate)
+            return BadRequest(new BasicResponse
+            {
+                Succeeded = false,
+                Message = "Start date must be before or equal to end date."
+            });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var overview = await _analyticsService.GetFinancialOverviewAsync(userId, startDate, endDate);
         return Ok(overview);
@@ -64,6 +71,12 @@ public class AnalyticsController : ControllerBase
         [FromQuery] string groupBy = "monthly",
         CancellationToken cancellationToken = default)
     {
+        if (startDate > endDate)
+            return BadRequest(new BasicResponse
+            {
+                Succeeded = false,
+                Message = "Start date must be before or equal to end date."
+            });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var trends = await _analyticsService.GetSpendingTrendsAsync(userId, startDate, endDate, groupBy);
         return Ok(trends);
@@ -89,6 +102,12 @@ public class AnalyticsController : ControllerBase
         [FromQuery] bool expenseOnly = true,
         CancellationToken cancellationToken = default)
     {
+        if (startDate > endDate)
+            return BadRequest(new BasicResponse
+            {
+                Succeeded = false,
+                Message = "Start date must be before or equal to end date."
+            });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var breakdown = await _analyticsService.GetCategoryBreakdownAsync(userId, startDate, endDate, expenseOnly);
         return Ok(breakdown);
@@ -110,6 +129,8 @@ public class AnalyticsController : ControllerBase
         [FromQuery] int numberOfMonths = 6,
         CancellationToken cancellationToken = default)
     {
+        numberOfMonths = Math.Clamp(numberOfMonths, 1, 24);
+
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var comparison = await _analyticsService.GetMonthlyComparisonAsync(userId, numberOfMonths);
         return Ok(comparison);
@@ -133,6 +154,12 @@ public class AnalyticsController : ControllerBase
         [FromQuery] int year,
         CancellationToken cancellationToken = default)
     {
+        if (month < 1 || month > 12)
+            return BadRequest(new BasicResponse
+            {
+                Succeeded = false,
+                Message = "Month must be between 1 and 12."
+            });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var performance = await _analyticsService.GetBudgetPerformanceAsync(userId, month, year);
         return Ok(performance);
@@ -160,6 +187,14 @@ public class AnalyticsController : ControllerBase
         [FromQuery] bool expenseOnly = true,
         CancellationToken cancellationToken = default)
     {
+        if (startDate > endDate)
+            return BadRequest(new BasicResponse
+            {
+                Succeeded = false,
+                Message = "Start date must be before or equal to end date."
+            });
+        count = Math.Clamp(count, 1, 20);
+
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var topCategories =
             await _analyticsService.GetTopCategoriesAsync(userId, startDate, endDate, count, expenseOnly);
