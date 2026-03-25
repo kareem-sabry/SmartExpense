@@ -136,7 +136,13 @@ public class TransactionRepository : GenericRepository<Transaction>, ITransactio
             .Include(t => t.Category)
             .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
     }
-
+    /// <inheritdoc/>
+    public async Task<bool> ExistsForRecurringOnDateAsync(int recurringTransactionId, DateTime date)
+    {
+        return await _dbSet.AnyAsync(t =>
+            t.RecurringTransactionId == recurringTransactionId &&
+            t.TransactionDate.Date == date.Date);
+    }
     #region Private Helper Methods
 
     /// <summary>

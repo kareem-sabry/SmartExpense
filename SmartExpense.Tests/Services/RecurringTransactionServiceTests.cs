@@ -526,26 +526,19 @@ public class RecurringTransactionServiceTests
             .Setup(x => x.GetAllForUserAsync(_userId, true))
             .ReturnsAsync(new List<RecurringTransaction> { recurring });
 
-        // Simulate existing transaction
+        // FK-based dedup: returns true to signal the transaction already exists
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>()))
-            .ReturnsAsync(new PagedResult<Transaction>
-            {
-                Data = new List<Transaction>
-                {
-                    new()
-                    {
-                        Description = "Monthly Rent (Auto-generated)",
-                        TransactionDate = new DateTime(2025, 2, 1)
-                    }
-                }
-            });
+            .Setup(x => x.ExistsForRecurringOnDateAsync(recurring.Id, It.IsAny<DateTime>()))
+            .ReturnsAsync(true);
 
         // Act
         var result = await _sut.GenerateTransactionsAsync(_userId);
 
         // Assert
         result.TransactionsGenerated.Should().Be(0); // No new transactions generated
+        _transactionRepositoryMock.Verify(
+            x => x.ExistsForRecurringOnDateAsync(recurring.Id, It.IsAny<DateTime>()),
+            Times.AtLeastOnce);
     }
 
     #endregion

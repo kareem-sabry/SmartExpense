@@ -59,11 +59,16 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
                 .WithMany()
                 .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
-
             entity.HasOne(t => t.Category)
                 .WithMany()
                 .HasForeignKey(t => t.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
+            // Nullable: manually created transactions have no recurring template.
+            entity.HasOne(t => t.RecurringTransaction)
+                .WithMany()
+                .HasForeignKey(t => t.RecurringTransactionId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         builder.Entity<Budget>(entity =>
