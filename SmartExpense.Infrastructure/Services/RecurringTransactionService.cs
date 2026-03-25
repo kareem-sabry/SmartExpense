@@ -176,8 +176,8 @@ public class RecurringTransactionService : IRecurringTransactionService
 
         foreach (var dueDate in dueDates)
         {
-            // Check if transaction already exists for this date
-            var exists = await TransactionExistsForDate(recurring.UserId, recurring.Id, dueDate);
+            // FK-based dedup: reliable regardless of description text changes
+            var exists = await TransactionExistsForDate(recurring.Id, dueDate);
             if (exists)
                 continue;
 
@@ -189,7 +189,9 @@ public class RecurringTransactionService : IRecurringTransactionService
                 Amount = recurring.Amount,
                 TransactionType = recurring.TransactionType,
                 TransactionDate = dueDate,
-                Notes = recurring.Notes
+                Notes = recurring.Notes,
+                // Stamp the FK so deduplication is reliable on future runs
+                RecurringTransactionId = recurring.Id
             };
 
             await _unitOfWork.Transactions.AddAsync(transaction);
@@ -248,20 +250,15 @@ public class RecurringTransactionService : IRecurringTransactionService
         };
     }
 
-    private async Task<bool> TransactionExistsForDate(Guid userId, int recurringId, DateTime date)
+    /// <summary>
+    /// Checks whether a transaction has already been generated for a given recurring
+    /// template on a specific date using a targeted FK lookup.
+    /// This replaces the previous string-based approach which matched on description
+    /// text and would break if the description suffix changed.
+    /// </summary>
+    private async Task<bool> TransactionExistsForDate(int recurringId, DateTime date)
     {
-        // Check if a transaction was already created for this recurring transaction on this date
-        var transactions = await _unitOfWork.Transactions.GetPagedAsync(
-            userId,
-            new Core.Models.TransactionQueryParameters
-            {
-                StartDate = date.Date,
-                EndDate = date.Date,
-                SearchTerm = "(Auto-generated)",
-                PageSize = 100
-            });
-
-        return transactions.Data.Any(t => t.TransactionDate.Date == date.Date);
+        return await _unitOfWork.Transactions.ExistsForRecurringOnDateAsync(recurringId, date);
     }
 
     private RecurringTransactionReadDto MapToReadDto(RecurringTransaction recurring)

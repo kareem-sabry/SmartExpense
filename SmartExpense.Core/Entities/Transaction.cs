@@ -19,6 +19,18 @@ public class Transaction : IAuditable, IEntity, IUserOwnedEntity
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
 
+    /// <summary>
+    /// Foreign key to the recurring transaction template that auto-generated this entry.
+    /// <c>null</c> for transactions created manually by the user.
+    /// </summary>
+    public int? RecurringTransactionId { get; set; }
+
     public User User { get; set; } = null!;
     public Category Category { get; set; } = null!;
+
+    /// <summary>
+    /// Navigation property to the recurring template that generated this transaction.
+    /// <c>null</c> for manually created transactions.
+    /// </summary>
+    public RecurringTransaction? RecurringTransaction { get; set; }
 }
