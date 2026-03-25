@@ -35,7 +35,7 @@ public class CategoryController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var categories = await _categoryService.GetAllAsync(userId);
+        var categories = await _categoryService.GetAllAsync(userId, cancellationToken);
         return Ok(categories);
     }
 
@@ -56,7 +56,7 @@ public class CategoryController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var category = await _categoryService.GetByIdAsync(id, userId);
+        var category = await _categoryService.GetByIdAsync(id, userId, cancellationToken);
         return Ok(category);
     }
 
@@ -80,7 +80,7 @@ public class CategoryController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var category = await _categoryService.CreateAsync(dto, userId);
+        var category = await _categoryService.CreateAsync(dto, userId, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = category.Id }, category);
     }
 
@@ -110,7 +110,7 @@ public class CategoryController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var category = await _categoryService.UpdateAsync(id, dto, userId);
+        var category = await _categoryService.UpdateAsync(id, dto, userId, cancellationToken);
         return Ok(category);
     }
 
@@ -135,7 +135,7 @@ public class CategoryController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        await _categoryService.DeleteAsync(id, userId);
+        await _categoryService.DeleteAsync(id, userId, cancellationToken);
         return NoContent();
     }
 }
