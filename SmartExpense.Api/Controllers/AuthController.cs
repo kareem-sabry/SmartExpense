@@ -67,13 +67,15 @@ public class AuthController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            var errors = ModelState.Values.SelectMany(v => v.Errors)
+            var errors = ModelState.Values
+                .SelectMany(v => v.Errors)
                 .Select(e => e.ErrorMessage)
                 .ToList();
-            return BadRequest(new RegisterResponse
+            // FIX: was incorrectly returning RegisterResponse on a login action
+            return BadRequest(new LoginResponse
             {
                 Succeeded = false,
-                Errors = errors
+                Message = string.Join("; ", errors)
             });
         }
 
