@@ -40,7 +40,7 @@ public class TransactionController : ControllerBase
         CancellationToken cancellationToken)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var result = await _transactionService.GetPagedAsync(userId, parameters);
+        var result = await _transactionService.GetPagedAsync(userId, parameters, cancellationToken);
         return Ok(result);
     }
 
@@ -59,7 +59,7 @@ public class TransactionController : ControllerBase
     public async Task<ActionResult<TransactionReadDto>> GetById(int id, CancellationToken cancellationToken)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var transaction = await _transactionService.GetByIdAsync(id, userId);
+        var transaction = await _transactionService.GetByIdAsync(id, userId, cancellationToken);
         return Ok(transaction);
     }
 
@@ -79,7 +79,7 @@ public class TransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var transactions = await _transactionService.GetRecentAsync(userId, count);
+        var transactions = await _transactionService.GetRecentAsync(userId, count, cancellationToken);
         return Ok(transactions);
     }
 
@@ -101,7 +101,7 @@ public class TransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var summary = await _transactionService.GetSummaryAsync(userId, startDate, endDate);
+        var summary = await _transactionService.GetSummaryAsync(userId, startDate, endDate, cancellationToken);
         return Ok(summary);
     }
 
@@ -131,7 +131,7 @@ public class TransactionController : ControllerBase
         CancellationToken cancellationToken)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var csv = await _transactionService.ExportToCsvAsync(userId, startDate, endDate);
+        var csv = await _transactionService.ExportToCsvAsync(userId, startDate, endDate, cancellationToken);
         var bytes = Encoding.UTF8.GetBytes(csv);
         var filename = $"transactions_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}.csv";
         return File(bytes, "text/csv", filename);
@@ -158,7 +158,7 @@ public class TransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var transaction = await _transactionService.CreateAsync(dto, userId);
+        var transaction = await _transactionService.CreateAsync(dto, userId, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = transaction.Id }, transaction);
     }
 
@@ -185,7 +185,7 @@ public class TransactionController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var transaction = await _transactionService.UpdateAsync(id, dto, userId);
+        var transaction = await _transactionService.UpdateAsync(id, dto, userId, cancellationToken);
         return Ok(transaction);
     }
 
@@ -205,7 +205,7 @@ public class TransactionController : ControllerBase
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken = default)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        await _transactionService.DeleteAsync(id, userId);
+        await _transactionService.DeleteAsync(id, userId, cancellationToken);
         return NoContent();
     }
 }

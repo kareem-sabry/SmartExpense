@@ -12,13 +12,13 @@ namespace SmartExpense.Tests.Services;
 
 public class TransactionServiceTests
 {
-    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
-    private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
-    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
     private readonly Mock<ICategoryRepository> _categoryRepositoryMock;
-    private readonly TransactionService _sut;
-    private readonly Guid _userId;
+    private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
     private readonly DateTime _now;
+    private readonly TransactionService _sut;
+    private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Guid _userId;
 
     public TransactionServiceTests()
     {
@@ -36,6 +36,73 @@ public class TransactionServiceTests
 
         _sut = new TransactionService(_unitOfWorkMock.Object, _dateTimeProviderMock.Object);
     }
+
+    #region GetRecentAsync Tests
+
+    [Fact]
+    public async Task GetRecentAsync_ShouldReturnRecentTransactions()
+    {
+        // Arrange
+        var category = new Category { Id = 1, Name = "Food" };
+        var transactions = new List<Transaction>
+        {
+            new() { Id = 1, UserId = _userId, Description = "Lunch", Category = category, TransactionDate = _now },
+            new()
+            {
+                Id = 2, UserId = _userId, Description = "Dinner", Category = category,
+                TransactionDate = _now.AddDays(-1)
+            }
+        };
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetRecentAsync(_userId, 10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(transactions);
+
+        // Act
+        var result = await _sut.GetRecentAsync(_userId);
+
+        // Assert
+        result.Should().HaveCount(2);
+        result.First().Description.Should().Be("Lunch");
+    }
+
+    #endregion
+
+    #region GetSummaryAsync Tests
+
+    [Fact]
+    public async Task GetSummaryAsync_ShouldReturnCorrectSummary()
+    {
+        // Arrange
+        var startDate = new DateTime(2025, 1, 1);
+        var endDate = new DateTime(2025, 1, 31);
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetTotalIncomeAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(5000m);
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetTotalExpenseAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2500m);
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetTransactionCountAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(25);
+
+        // Act
+        var result = await _sut.GetSummaryAsync(_userId, startDate, endDate);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.TotalIncome.Should().Be(5000m);
+        result.TotalExpense.Should().Be(2500m);
+        result.NetBalance.Should().Be(2500m);
+        result.TransactionCount.Should().Be(25);
+        result.StartDate.Should().Be(startDate);
+        result.EndDate.Should().Be(endDate);
+    }
+
+    #endregion
 
     #region GetPagedAsync Tests
 
@@ -74,7 +141,7 @@ public class TransactionServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, parameters))
+            .Setup(x => x.GetPagedAsync(_userId, parameters, It.IsAny<CancellationToken>()))
             .ReturnsAsync(pagedResult);
 
         // Act
@@ -103,7 +170,7 @@ public class TransactionServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, parameters))
+            .Setup(x => x.GetPagedAsync(_userId, parameters, It.IsAny<CancellationToken>()))
             .ReturnsAsync(pagedResult);
 
         // Act
@@ -136,7 +203,7 @@ public class TransactionServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(transaction);
 
         // Act
@@ -155,7 +222,7 @@ public class TransactionServiceTests
     {
         // Arrange
         _transactionRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Transaction?)null);
 
         // Act
@@ -164,73 +231,6 @@ public class TransactionServiceTests
         // Assert
         await act.Should().ThrowAsync<NotFoundException>()
             .WithMessage("Transaction with identifier '999' was not found.");
-    }
-
-    #endregion
-
-    #region GetRecentAsync Tests
-
-    [Fact]
-    public async Task GetRecentAsync_ShouldReturnRecentTransactions()
-    {
-        // Arrange
-        var category = new Category { Id = 1, Name = "Food" };
-        var transactions = new List<Transaction>
-        {
-            new() { Id = 1, UserId = _userId, Description = "Lunch", Category = category, TransactionDate = _now },
-            new()
-            {
-                Id = 2, UserId = _userId, Description = "Dinner", Category = category,
-                TransactionDate = _now.AddDays(-1)
-            }
-        };
-
-        _transactionRepositoryMock
-            .Setup(x => x.GetRecentAsync(_userId, 10))
-            .ReturnsAsync(transactions);
-
-        // Act
-        var result = await _sut.GetRecentAsync(_userId, 10);
-
-        // Assert
-        result.Should().HaveCount(2);
-        result.First().Description.Should().Be("Lunch");
-    }
-
-    #endregion
-
-    #region GetSummaryAsync Tests
-
-    [Fact]
-    public async Task GetSummaryAsync_ShouldReturnCorrectSummary()
-    {
-        // Arrange
-        var startDate = new DateTime(2025, 1, 1);
-        var endDate = new DateTime(2025, 1, 31);
-
-        _transactionRepositoryMock
-            .Setup(x => x.GetTotalIncomeAsync(_userId, startDate, endDate))
-            .ReturnsAsync(5000m);
-
-        _transactionRepositoryMock
-            .Setup(x => x.GetTotalExpenseAsync(_userId, startDate, endDate))
-            .ReturnsAsync(2500m);
-
-        _transactionRepositoryMock
-            .Setup(x => x.GetTransactionCountAsync(_userId, startDate, endDate))
-            .ReturnsAsync(25);
-
-        // Act
-        var result = await _sut.GetSummaryAsync(_userId, startDate, endDate);
-
-        // Assert
-        result.Should().NotBeNull();
-        result.TotalIncome.Should().Be(5000m);
-        result.TotalExpense.Should().Be(2500m);
-        result.NetBalance.Should().Be(2500m);
-        result.TransactionCount.Should().Be(25);
-        result.StartDate.Should().Be(startDate);
-        result.EndDate.Should().Be(endDate);
     }
 
     #endregion
@@ -261,16 +261,16 @@ public class TransactionServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         _transactionRepositoryMock
-            .Setup(x => x.AddAsync(It.IsAny<Transaction>()))
-            .ReturnsAsync((Transaction t) => t);
+            .Setup(x => x.AddAsync(It.IsAny<Transaction>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Transaction t, CancellationToken ct) => t);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(It.IsAny<int>(), _userId))
-            .ReturnsAsync((int id, Guid userId) => new Transaction
+            .Setup(x => x.GetByIdForUserAsync(It.IsAny<int>(), _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int id, Guid userId, CancellationToken ct) => new Transaction
             {
                 Id = 1,
                 UserId = userId,
@@ -297,9 +297,9 @@ public class TransactionServiceTests
             t.CategoryId == dto.CategoryId &&
             t.Description == dto.Description &&
             t.Amount == dto.Amount
-        )), Times.Once);
+        ), It.IsAny<CancellationToken>()), Times.Once);
 
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -316,7 +316,7 @@ public class TransactionServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Category?)null);
 
         // Act
@@ -326,7 +326,9 @@ public class TransactionServiceTests
         await act.Should().ThrowAsync<NotFoundException>()
             .WithMessage("Category with identifier '999' was not found.");
 
-        _transactionRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Transaction>()), Times.Never);
+        _transactionRepositoryMock.Verify(
+            x => x.AddAsync(It.IsAny<Transaction>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -351,7 +353,7 @@ public class TransactionServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         // Act
@@ -361,7 +363,9 @@ public class TransactionServiceTests
         await act.Should().ThrowAsync<ValidationException>()
             .WithMessage("Cannot create transaction with inactive category");
 
-        _transactionRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Transaction>()), Times.Never);
+        _transactionRepositoryMock.Verify(
+            x => x.AddAsync(It.IsAny<Transaction>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -386,7 +390,7 @@ public class TransactionServiceTests
         };
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         // Act
@@ -396,7 +400,8 @@ public class TransactionServiceTests
         await act.Should().ThrowAsync<ValidationException>()
             .WithMessage("Transaction date cannot be in the future");
 
-        _transactionRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Transaction>()), Times.Never);
+        _transactionRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Transaction>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     #endregion
@@ -437,11 +442,11 @@ public class TransactionServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingTransaction);
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
         // Act
@@ -456,9 +461,9 @@ public class TransactionServiceTests
             t.Id == 1 &&
             t.Description == dto.Description &&
             t.Amount == dto.Amount
-        )), Times.Once);
+        ), It.IsAny<CancellationToken>()), Times.Once);
 
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -475,7 +480,7 @@ public class TransactionServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Transaction?)null);
 
         // Act
@@ -483,7 +488,7 @@ public class TransactionServiceTests
 
         // Assert
         await act.Should().ThrowAsync<NotFoundException>();
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Never);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -512,11 +517,11 @@ public class TransactionServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingTransaction);
 
         _categoryRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(2, _userId))
+            .Setup(x => x.GetByIdForUserAsync(2, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(newCategory);
 
         // Act
@@ -545,15 +550,15 @@ public class TransactionServiceTests
         };
 
         _transactionRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(1, _userId))
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(transaction);
 
         // Act
         await _sut.DeleteAsync(1, _userId);
 
         // Assert
-        _transactionRepositoryMock.Verify(x => x.DeleteAsync(1), Times.Once);
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _transactionRepositoryMock.Verify(x => x.DeleteAsync(1, It.IsAny<CancellationToken>()), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -561,15 +566,16 @@ public class TransactionServiceTests
     {
         // Arrange
         _transactionRepositoryMock
-            .Setup(x => x.GetByIdForUserAsync(999, _userId))
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Transaction?)null);
 
         // Act
-        Func<Task> act = async () => await _sut.DeleteAsync(999, _userId);
+        var act = async () => await _sut.DeleteAsync(999, _userId);
 
         // Assert
         await act.Should().ThrowAsync<NotFoundException>();
-        _transactionRepositoryMock.Verify(x => x.DeleteAsync(It.IsAny<int>()), Times.Never);
+        _transactionRepositoryMock.Verify(x => x.DeleteAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     #endregion

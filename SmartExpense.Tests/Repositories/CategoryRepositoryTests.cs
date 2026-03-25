@@ -15,12 +15,18 @@ public class CategoryRepositoryTests : IDisposable
     public CategoryRepositoryTests()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
         _context = new AppDbContext(options);
         _sut = new CategoryRepository(_context);
         _userId = Guid.NewGuid();
+    }
+
+    public void Dispose()
+    {
+        _context.Database.EnsureDeleted();
+        _context.Dispose();
     }
 
     [Fact]
@@ -124,11 +130,5 @@ public class CategoryRepositoryTests : IDisposable
 
         // Assert
         result.Should().BeFalse(); // Should return false because we're excluding the only match
-    }
-
-    public void Dispose()
-    {
-        _context.Database.EnsureDeleted();
-        _context.Dispose();
     }
 }

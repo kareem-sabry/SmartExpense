@@ -25,22 +25,18 @@ public class GlobalExceptionHandler : IExceptionHandler
         // Expected domain exceptions (4xx) are informational — log as Warning.
         // Unexpected failures (5xx) are actual errors that need investigation.
         if (statusCode >= 500)
-        {
             _logger.LogError(exception,
                 "Unhandled server error on {Method} {Path}: {Message}",
                 httpContext.Request.Method,
                 httpContext.Request.Path,
                 exception.Message);
-        }
         else
-        {
             _logger.LogWarning(
                 "{ExceptionType} on {Method} {Path}: {Message}",
                 exception.GetType().Name,
                 httpContext.Request.Method,
                 httpContext.Request.Path,
                 exception.Message);
-        }
 
         var problemDetails = CreateProblemDetails(httpContext, exception, statusCode, title);
 

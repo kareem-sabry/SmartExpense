@@ -47,7 +47,7 @@ public class AnalyticsController : ControllerBase
                 Message = "Start date must be before or equal to end date."
             });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var overview = await _analyticsService.GetFinancialOverviewAsync(userId, startDate, endDate);
+        var overview = await _analyticsService.GetFinancialOverviewAsync(userId, startDate, endDate, cancellationToken);
         return Ok(overview);
     }
 
@@ -78,7 +78,7 @@ public class AnalyticsController : ControllerBase
                 Message = "Start date must be before or equal to end date."
             });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var trends = await _analyticsService.GetSpendingTrendsAsync(userId, startDate, endDate, groupBy);
+        var trends = await _analyticsService.GetSpendingTrendsAsync(userId, startDate, endDate, groupBy, cancellationToken);
         return Ok(trends);
     }
 
@@ -109,7 +109,7 @@ public class AnalyticsController : ControllerBase
                 Message = "Start date must be before or equal to end date."
             });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var breakdown = await _analyticsService.GetCategoryBreakdownAsync(userId, startDate, endDate, expenseOnly);
+        var breakdown = await _analyticsService.GetCategoryBreakdownAsync(userId, startDate, endDate, expenseOnly, cancellationToken);
         return Ok(breakdown);
     }
 
@@ -132,7 +132,7 @@ public class AnalyticsController : ControllerBase
         numberOfMonths = Math.Clamp(numberOfMonths, 1, 24);
 
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var comparison = await _analyticsService.GetMonthlyComparisonAsync(userId, numberOfMonths);
+        var comparison = await _analyticsService.GetMonthlyComparisonAsync(userId, numberOfMonths, cancellationToken);
         return Ok(comparison);
     }
 
@@ -161,7 +161,7 @@ public class AnalyticsController : ControllerBase
                 Message = "Month must be between 1 and 12."
             });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var performance = await _analyticsService.GetBudgetPerformanceAsync(userId, month, year);
+        var performance = await _analyticsService.GetBudgetPerformanceAsync(userId, month, year, cancellationToken);
         return Ok(performance);
     }
 
@@ -197,7 +197,7 @@ public class AnalyticsController : ControllerBase
 
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var topCategories =
-            await _analyticsService.GetTopCategoriesAsync(userId, startDate, endDate, count, expenseOnly);
+            await _analyticsService.GetTopCategoriesAsync(userId, startDate, endDate, count, expenseOnly, cancellationToken);
         return Ok(topCategories);
     }
 }

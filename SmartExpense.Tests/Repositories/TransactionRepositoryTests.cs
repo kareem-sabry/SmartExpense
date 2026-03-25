@@ -10,15 +10,15 @@ namespace SmartExpense.Tests.Repositories;
 
 public class TransactionRepositoryTests : IDisposable
 {
+    private readonly Category _category;
     private readonly AppDbContext _context;
     private readonly TransactionRepository _sut;
     private readonly Guid _userId;
-    private readonly Category _category;
 
     public TransactionRepositoryTests()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
         _context = new AppDbContext(options);
@@ -38,6 +38,12 @@ public class TransactionRepositoryTests : IDisposable
 
         _context.Categories.Add(_category);
         _context.SaveChanges();
+    }
+
+    public void Dispose()
+    {
+        _context.Database.EnsureDeleted();
+        _context.Dispose();
     }
 
     [Fact]
@@ -337,11 +343,5 @@ public class TransactionRepositoryTests : IDisposable
 
         // Assert
         result.Should().Be(1500m); // Only income transactions
-    }
-
-    public void Dispose()
-    {
-        _context.Database.EnsureDeleted();
-        _context.Dispose();
     }
 }

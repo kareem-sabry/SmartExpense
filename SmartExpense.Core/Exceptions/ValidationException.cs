@@ -2,8 +2,6 @@
 
 public class ValidationException : Exception
 {
-    public IDictionary<string, string[]> Errors { get; }
-
     public ValidationException(string message) : base(message)
     {
         Errors = new Dictionary<string, string[]>();
@@ -13,4 +11,6 @@ public class ValidationException : Exception
     {
         Errors = errors;
     }
+
+    public IDictionary<string, string[]> Errors { get; }
 }

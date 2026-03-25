@@ -51,7 +51,7 @@ public class AnalyticsControllerTests
         };
 
         _analyticsServiceMock
-            .Setup(x => x.GetFinancialOverviewAsync(_userId, startDate, endDate))
+            .Setup(x => x.GetFinancialOverviewAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(overview);
 
         // Act
@@ -82,11 +82,11 @@ public class AnalyticsControllerTests
         };
 
         _analyticsServiceMock
-            .Setup(x => x.GetSpendingTrendsAsync(_userId, startDate, endDate, "monthly"))
+            .Setup(x => x.GetSpendingTrendsAsync(_userId, startDate, endDate, "monthly", It.IsAny<CancellationToken>()))
             .ReturnsAsync(trends);
 
         // Act
-        var result = await _sut.GetSpendingTrends(startDate, endDate, "monthly");
+        var result = await _sut.GetSpendingTrends(startDate, endDate);
 
         // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
@@ -112,11 +112,11 @@ public class AnalyticsControllerTests
         };
 
         _analyticsServiceMock
-            .Setup(x => x.GetCategoryBreakdownAsync(_userId, startDate, endDate, true))
+            .Setup(x => x.GetCategoryBreakdownAsync(_userId, startDate, endDate, true, It.IsAny<CancellationToken>()))
             .ReturnsAsync(breakdown);
 
         // Act
-        var result = await _sut.GetCategoryBreakdown(startDate, endDate, expenseOnly: true);
+        var result = await _sut.GetCategoryBreakdown(startDate, endDate);
 
         // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
@@ -139,11 +139,11 @@ public class AnalyticsControllerTests
         };
 
         _analyticsServiceMock
-            .Setup(x => x.GetMonthlyComparisonAsync(_userId, 6))
+            .Setup(x => x.GetMonthlyComparisonAsync(_userId, 6, It.IsAny<CancellationToken>()))
             .ReturnsAsync(comparison);
 
         // Act
-        var result = await _sut.GetMonthlyComparison(numberOfMonths: 6);
+        var result = await _sut.GetMonthlyComparison();
 
         // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
@@ -167,11 +167,11 @@ public class AnalyticsControllerTests
         };
 
         _analyticsServiceMock
-            .Setup(x => x.GetBudgetPerformanceAsync(_userId, 2, 2025))
+            .Setup(x => x.GetBudgetPerformanceAsync(_userId, 2, 2025, It.IsAny<CancellationToken>()))
             .ReturnsAsync(performance);
 
         // Act
-        var result = await _sut.GetBudgetPerformance(month: 2, year: 2025);
+        var result = await _sut.GetBudgetPerformance(2, 2025);
 
         // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
@@ -197,11 +197,11 @@ public class AnalyticsControllerTests
         };
 
         _analyticsServiceMock
-            .Setup(x => x.GetTopCategoriesAsync(_userId, startDate, endDate, 5, true))
+            .Setup(x => x.GetTopCategoriesAsync(_userId, startDate, endDate, 5, true, It.IsAny<CancellationToken>()))
             .ReturnsAsync(topCategories);
 
         // Act
-        var result = await _sut.GetTopCategories(startDate, endDate, count: 5, expenseOnly: true);
+        var result = await _sut.GetTopCategories(startDate, endDate);
 
         // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;

@@ -227,18 +227,15 @@ public static class DbInitializer
             return;
         }
 
-        var user = User.Create(email: admin.Email, firstName: admin.FirstName, lastName: admin.LastName,
-            createdAt: dateTimeProvider.UtcNow);
+        var user = User.Create(admin.Email, admin.FirstName, admin.LastName,
+            dateTimeProvider.UtcNow);
 
         var createResult = await userManager.CreateAsync(user, admin.Password);
 
         if (!createResult.Succeeded)
         {
             logger.LogError("Failed to create Admin user.");
-            foreach (var error in createResult.Errors)
-            {
-                logger.LogError(" - {Description}", error.Description);
-            }
+            foreach (var error in createResult.Errors) logger.LogError(" - {Description}", error.Description);
 
             return;
         }
