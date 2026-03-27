@@ -9,10 +9,15 @@ public class TransactionQueryParameters
 
     public int PageNumber { get; set; } = 1;
 
+    /// <summary>
+    /// Gets or sets the page size. Capped at <c>50</c> for paginated API responses.
+    /// Pass <see cref="int.MaxValue"/> explicitly for internal analytics queries that
+    /// require the full data set — this bypasses the cap intentionally.
+    /// </summary>
     public int PageSize
     {
         get => _pageSize;
-        set => _pageSize = value > MaxPageSize ? MaxPageSize : value;
+        set => _pageSize = (value != int.MaxValue && value > MaxPageSize) ? MaxPageSize : value;
     }
 
     public string? SearchTerm { get; set; }
