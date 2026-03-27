@@ -7,15 +7,15 @@ using SmartExpense.Core.Constants;
 using SmartExpense.Core.Entities;
 using SmartExpense.Core.Exceptions;
 using SmartExpense.Infrastructure.Data;
-using ValidationException = System.ComponentModel.DataAnnotations.ValidationException;
+using ValidationException = SmartExpense.Core.Exceptions.ValidationException;
 
 namespace SmartExpense.Infrastructure.Services;
 
 public class AdminService : IAdminService
 {
-    private readonly AppDbContext _context;
     private readonly ILogger<AdminService> _logger;
     private readonly RoleManager<IdentityRole<Guid>> _roleManager;
+    private readonly AppDbContext _context;
     private readonly UserManager<User> _userManager;
 
     public AdminService(UserManager<User> userManager, ILogger<AdminService> logger,
@@ -29,34 +29,31 @@ public class AdminService : IAdminService
 
     public async Task<IEnumerable<UserWithRolesDto>> GetAllUsersAsync()
     {
-        var users = await _userManager.Users.ToListAsync();
-
-        if (!users.Any()) return Enumerable.Empty<UserWithRolesDto>();
+        var users = await _userManager.Users
+            .Select(u => new { u.Id, u.Email, u.FirstName, u.LastName })
+            .ToListAsync();
 
         var userIds = users.Select(u => u.Id).ToList();
-        ;
 
-        var userRoles = await _context.UserRoles.Where(ur => userIds.Contains(ur.UserId))
+        var rolesByUser = await _context.UserRoles
+            .Where(ur => userIds.Contains(ur.UserId))
             .Join(_context.Roles,
                 ur => ur.RoleId,
                 r => r.Id,
-                (ur, r) => new { ur.UserId, r.Name }
-            ).ToListAsync();
+                (ur, r) => new { ur.UserId, r.Name })
+            .GroupBy(x => x.UserId)
+            .ToDictionaryAsync(
+                g => g.Key,
+                g => g.Select(x => x.Name).OfType<string>().ToList());
 
-        var rolesByUser = userRoles
-            .GroupBy(ur => ur.UserId)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.Name).ToList());
-
-        var usersWithRoles = users.Select(user => new UserWithRolesDto
+        return users.Select(user => new UserWithRolesDto
         {
             Id = user.Id,
             Email = user.Email ?? string.Empty,
             FirstName = user.FirstName,
             LastName = user.LastName,
-            Roles = rolesByUser.TryGetValue(user.Id, out var roles) ? roles! : new List<string>()
-        }).ToList();
-
-        return usersWithRoles;
+            Roles = rolesByUser.GetValueOrDefault(user.Id) ?? []
+        });
     }
 
     public async Task<UserWithRolesDto?> GetUserByIdAsync(Guid userId)
