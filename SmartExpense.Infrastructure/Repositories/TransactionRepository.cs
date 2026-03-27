@@ -15,7 +15,6 @@ namespace SmartExpense.Infrastructure.Repositories;
 /// </summary>
 public class TransactionRepository : GenericRepository<Transaction>, ITransactionRepository
 {
-    /// ///
     /// <summary>Initialises a new instance of <see cref="TransactionRepository" />.</summary>
     public TransactionRepository(AppDbContext context) : base(context)
     {
@@ -168,7 +167,7 @@ public class TransactionRepository : GenericRepository<Transaction>, ITransactio
         // Search term filter
         if (!string.IsNullOrWhiteSpace(parameters.SearchTerm))
         {
-            var searchTerm = parameters.SearchTerm.ToLower();
+            var searchTerm = parameters.SearchTerm;
             query = query.Where(t =>
                 t.Description.Contains(searchTerm) ||
                 (t.Notes != null && t.Notes.Contains(searchTerm)));
