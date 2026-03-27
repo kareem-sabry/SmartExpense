@@ -11,7 +11,7 @@ public interface IAccountService
     Task<LoginResponse> LoginAsync(LoginRequest request);
     Task<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest refreshTokenRequest);
     Task<LogoutResponse> LogoutAsync(string userEmail);
-    Task<UserProfileDto> GetCurrentUserAsync(string userEmail);
+    Task<UserProfileDto?> GetCurrentUserAsync(string userEmail);
     Task<BasicResponse> ForgotPasswordAsync(ForgotPasswordRequest request);
     Task<BasicResponse> ResetPasswordAsync(ResetPasswordRequest request);
     Task<BasicResponse> DeleteMyAccountAsync(string userEmail);
