@@ -21,7 +21,6 @@
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
-
 # User secrets
 appsettings.Development.json
 secrets.json
@@ -48,7 +47,7 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
-
+.env
 # NuGet
 *.nupkg
 *.snupkg

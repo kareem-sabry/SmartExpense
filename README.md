@@ -1,210 +1,160 @@
 # SmartExpense API
 
-A full-featured expense tracking REST API built with .NET 8 and Clean Architecture. Track your spending, set budgets, manage recurring transactions, and get detailed analytics on your finances.
+A full-featured expense tracking REST API built with ASP.NET Core 8 and Clean Architecture. I built this to demonstrate what a real production backend looks like — proper architecture, security, testing, and features that go beyond basic CRUD.
 
-## Why I Built This
+---
 
-I wanted to build something practical that demonstrates solid backend development skills. Most expense trackers focus on the frontend, but I wanted to show I can design and implement a complete API with proper architecture, testing, and real-world features like auto-generation and analytics.
+## Features
 
-## What It Does
+- **JWT authentication** — register, login, refresh token rotation, account lockout, and password reset via email
+- **Transaction management** — full CRUD with pagination, filtering, sorting, and CSV export
+- **Budget tracking** — per-category monthly budgets with live spend calculation and status alerts (under / approaching / exceeded)
+- **Recurring transactions** — frequency-based templates (daily/weekly/monthly/yearly) with FK-based deduplication
+- **Financial analytics** — spending trends, category breakdowns, month-over-month comparisons, and budget performance
+- **Admin panel** — user management and role assignment
+- **Rate limiting** — global and per-endpoint limits with IP-based partitioning
+- **Security headers** — X-Content-Type-Options, X-Frame-Options, CSP, and more
+- **Audit trail** — every entity write stamps `CreatedBy`, `UpdatedBy`, `CreatedAtUtc`, `UpdatedAtUtc` via an EF Core interceptor
+- **Health check** — `/health` returns structured JSON with per-component status
 
-**Core Features:**
-- 🔐 JWT authentication with refresh tokens
-- 💸 Full transaction management with filtering and pagination
-- 💰 Monthly budgets with tracking and alerts
-- 🔄 Recurring transactions (monthly rent, weekly subscriptions, etc.)
-- 📊 Financial analytics and spending trends
-- 👥 Multi-user support with role-based access
-
-**The Cool Stuff:**
-- Automatic transaction generation for recurring expenses
-- Budget performance tracking with "on track" indicators
-- Category breakdown with percentages for spending analysis
-- Month-over-month comparisons to see financial trends
-- Comprehensive financial overview dashboard
-
-## Tech Stack
-
-- **.NET 8** - Latest C# features and performance improvements
-- **ASP.NET Core Web API** - RESTful API design
-- **Entity Framework Core 8** - Code-first database approach
-- **SQL Server** - Relational database
-- **JWT Authentication** - Secure token-based auth
-- **xUnit, Moq, FluentAssertions** - 130 unit tests with 90%+ coverage
-- **Swagger/OpenAPI** - API documentation and testing
+---
 
 ## Architecture
 
-I used Clean Architecture to keep things organized and maintainable:
-
 ```
-SmartExpense.Api          → Controllers, Middleware
-SmartExpense.Application  → DTOs, Service Interfaces
-SmartExpense.Infrastructure → Repositories, Services, Data Access
-SmartExpense.Core         → Domain Entities, Business Rules
-SmartExpense.Tests        → Unit Tests
+SmartExpense.Core           → Entities, domain exceptions, interfaces, enums
+SmartExpense.Application    → DTOs, service interfaces, repository interfaces
+SmartExpense.Infrastructure → EF Core repos, service implementations, interceptors
+SmartExpense.Api            → Controllers, middleware, Program.cs
+SmartExpense.Tests          → xUnit unit tests (services, repositories, controllers)
 ```
 
-**Design Patterns:**
-- Repository Pattern for data access
-- Unit of Work for transaction management
-- Dependency Injection throughout
-- Custom exception handling with global error handler
-- Audit interceptor for tracking created/updated records
+Dependencies only point inward: `Api → Infrastructure → Application → Core`.
 
-## API Endpoints
-
-**45 endpoints across 6 feature areas:**
-
-### Authentication (8 endpoints)
-- Register, Login, Logout
-- Refresh token
-- Password reset
-- Email confirmation
-
-### Transactions (7 endpoints)
-- CRUD operations
-- Advanced filtering (by date, category, amount, type)
-- Pagination and sorting
-- Recent transactions
-- Financial summaries
-
-### Budgets (6 endpoints)
-- Monthly budget management
-- Budget vs actual tracking
-- Budget status (under/approaching/exceeded)
-- Monthly summaries
-
-### Recurring Transactions (8 endpoints)
-- Set up recurring patterns (daily, weekly, monthly, yearly)
-- Automatic generation
-- Pause/resume
-- Prevents duplicates
-
-### Analytics (6 endpoints)
-- Financial overview
-- Spending trends (daily/weekly/monthly)
-- Category breakdown with percentages
-- Month-over-month comparisons
-- Budget performance
-- Top spending categories
-
-### Admin (5 endpoints)
-- User management
-- Role assignment
-
-Plus a health check endpoint for monitoring.
+---
 
 ## Getting Started
 
-### Prerequisites
+### Option A — Docker (recommended, zero setup)
 
-- .NET 8 SDK
-- SQL Server (or SQL Server LocalDB)
-- Your favorite IDE (I use Rider, but VS Code or Visual Studio work great)
-
-### Installation
-
-1. Clone the repo
 ```bash
 git clone https://github.com/karem-sabry/SmartExpense.git
 cd SmartExpense
+cp .env.example .env        # fill in your values
+docker compose up --build
 ```
 
-2. Set up user secrets (don't put sensitive data in appsettings.json!)
+The API will be available at `http://localhost:5000`.  
+Swagger UI opens at `http://localhost:5000/swagger`.  
+SQL Server data is persisted in a Docker volume across restarts.
+
+### Option B — Local development
+
+**Prerequisites:** .NET 8 SDK, SQL Server (or LocalDB)
+
+1. Clone the repo
+
+2. Set up user secrets (never commit real values):
 ```bash
 cd SmartExpense.Api
-dotnet user-secrets init
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "YOUR_CONNECTION_STRING"
-dotnet user-secrets set "JwtOptions:Secret" "your-super-secret-key-at-least-32-characters"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=.;Database=SmartExpense;Trusted_Connection=True;TrustServerCertificate=True;"
+dotnet user-secrets set "JwtOptions:Secret" "your-super-secret-jwt-key-min-32-chars"
+dotnet user-secrets set "JwtOptions:Issuer" "SmartExpenseApi"
+dotnet user-secrets set "JwtOptions:Audience" "SmartExpenseClient"
+dotnet user-secrets set "AdminUser:Email" "admin@smartexpense.com"
+dotnet user-secrets set "AdminUser:Password" "Admin@12345"
+dotnet user-secrets set "AdminUser:FirstName" "Admin"
+dotnet user-secrets set "AdminUser:LastName" "User"
 ```
 
-3. Run migrations
+3. Apply migrations and run:
 ```bash
-cd ../SmartExpense.Infrastructure
-dotnet ef database update --startup-project ../SmartExpense.Api
+dotnet ef database update --project SmartExpense.Infrastructure --startup-project SmartExpense.Api
+dotnet run --project SmartExpense.Api
 ```
 
-4. Run the API
-```bash
-cd ../SmartExpense.Api
-dotnet run
-```
+---
 
-5. Open Swagger UI
-   Navigate to `https://localhost:7xxx/swagger` (check console for exact port)
-
-## Testing
-
-The project has 130 unit tests covering all major functionality:
+## Running Tests
 
 ```bash
-cd SmartExpense.Tests
-dotnet test
+dotnet test SmartExpense.sln --verbosity normal
 ```
 
-Tests cover:
-- Service layer business logic
-- Repository queries and filtering
-- Controller responses
-- Error handling and validation
-- Edge cases and boundary conditions
+130 unit tests covering service layer business logic, repository queries, and controller responses.  
+90%+ code coverage via FluentAssertions + Moq.
 
-## What I Learned
+---
 
-Building this taught me a lot about:
-- Designing a clean API architecture that's easy to maintain
-- Writing testable code (dependency injection is your friend)
-- Handling authentication properly with JWTs and refresh tokens
-- Working with EF Core for complex queries
-- Creating algorithms (the recurring transaction auto-generation was fun)
-- Writing meaningful tests that actually catch bugs
+## Environment Variables
 
-The hardest part was getting the recurring transaction generation right - figuring out the date calculations and making sure we don't create duplicates took some thinking.
+| Variable | Description |
+|---|---|
+| `ConnectionStrings__DefaultConnection` | SQL Server connection string |
+| `JwtOptions__Secret` | JWT signing key (minimum 32 characters) |
+| `JwtOptions__Issuer` | JWT issuer claim |
+| `JwtOptions__Audience` | JWT audience claim |
+| `JwtOptions__ExpirationMinutes` | Access token lifetime in minutes |
+| `AdminUser__Email` | Seeded admin account email |
+| `AdminUser__Password` | Seeded admin account password |
+| `EmailOptions__SmtpHost` | SMTP host for password reset emails |
+| `EmailOptions__SmtpPort` | SMTP port |
+| `EmailOptions__FromEmail` | Sender address |
 
-## What I'd Add Next
+---
 
-If I keep working on this (or use it as a base for a real project):
-- Export transactions to CSV or Excel
-- Import transactions from bank statements
-- Shared budgets for families/roommates
-- Email notifications for budget alerts
-- Mobile app using this as the backend
-- Docker containerization
-- CI/CD pipeline
+## API Overview
 
-## Project Stats
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| POST | `/api/v1/auth/register` | — | Register a new user |
+| POST | `/api/v1/auth/login` | — | Login and receive JWT + refresh token |
+| POST | `/api/v1/auth/refresh-token` | — | Rotate refresh token |
+| POST | `/api/v1/auth/forgot-password` | — | Send password reset email |
+| GET | `/api/v1/transactions` | User | Paginated and filtered transaction list |
+| POST | `/api/v1/transactions` | User | Create transaction |
+| GET | `/api/v1/transactions/export` | User | Download transactions as CSV |
+| GET | `/api/v1/budgets` | User | List budgets |
+| GET | `/api/v1/budgets/summary` | User | Monthly budget summary with status |
+| POST | `/api/v1/recurring` | User | Create recurring template |
+| POST | `/api/v1/recurring/{id}/generate` | User | Manually trigger transaction generation |
+| GET | `/api/v1/analytics/overview` | User | Financial overview dashboard |
+| GET | `/api/v1/analytics/trends` | User | Spending trends |
+| GET | `/api/v1/analytics/monthly-comparison` | User | Month-over-month comparison |
+| GET | `/api/v1/admin/users` | Admin | List all users with roles |
+| POST | `/api/v1/admin/users/{id}/roles` | Admin | Assign role to user |
+| GET | `/health` | — | Service health status |
 
-- **130 unit tests** with 90%+ code coverage
-- **45 REST endpoints** across 5 feature modules
-- **5 entities** with proper relationships
-- **Clean Architecture** with clear separation of concerns
-- **0 warnings** on build
+Full Swagger documentation is available at `/swagger` when running.
 
-## Why Clean Architecture?
+---
 
-I chose Clean Architecture because it:
-- Makes the code easier to test (no tight coupling)
-- Keeps business logic separate from infrastructure
-- Makes it easier to swap out parts (like changing from SQL Server to PostgreSQL)
-- Is a pattern used in real production codebases
+## Recurring Transactions
 
-It's a bit more setup than throwing everything in one project, but it pays off when the codebase grows.
+Recurring templates define a category, amount, and frequency. The service generates actual `Transaction` records for every due date since the last run. Deduplication uses a `RecurringTransactionId` FK — not string matching — so it is immune to description changes.
+
+---
+
+## Tech Stack
+
+- **ASP.NET Core 8** — Web API
+- **Entity Framework Core 8** — Code-first, migrations
+- **SQL Server** — Relational database
+- **xUnit + Moq + FluentAssertions** — Testing
+- **Swagger / OpenAPI** — API documentation
+
+---
 
 ## Contact
 
 **Karem Sabry**
 
-- GitHub: [@karem-sabry](https://github.com/karem-sabry)
-- LinkedIn: [karem-sabry](https://www.linkedin.com/in/karem-sabry/)
-- Email: karemsabry2013@gmail.com
-
-Feel free to reach out if you have questions or want to discuss the project!
-
-## License
-
-This project is open source and available under the MIT License.
+- GitHub: [@kareem-sabry](https://github.com/kareem-sabry)
+- LinkedIn: [k-sabry](https://www.linkedin.com/in/kareem-sabry/)
+- Email: kareemsabry.mail@gmail.com
 
 ---
 
-Built with ☕ and a lot of unit tests.
+## License
+
+MIT
