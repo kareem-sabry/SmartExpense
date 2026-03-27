@@ -20,8 +20,7 @@ public class BudgetService : IBudgetService
     /// <summary>Initialises a new instance of <see cref="BudgetService" />.</summary>
     /// <param name="unitOfWork">Unit of Work providing access to all repositories.</param>
     /// <param name="dateTimeProvider">Abstraction over the system clock for testability.</param>
-    public BudgetService(IUnitOfWork unitOfWork, IDateTimeProvider dateTimeProvider,
-        CancellationToken cancellationToken = default)
+    public BudgetService(IUnitOfWork unitOfWork, IDateTimeProvider dateTimeProvider)
     {
         _unitOfWork = unitOfWork;
         _dateTimeProvider = dateTimeProvider;
@@ -37,7 +36,7 @@ public class BudgetService : IBudgetService
     public async Task<List<BudgetReadDto>> GetAllAsync(Guid userId, int? month, int? year,
         CancellationToken cancellationToken = default)
     {
-        var budgets = await _unitOfWork.Budgets.GetAllForUserAsync(userId, month, year);
+        var budgets = await _unitOfWork.Budgets.GetAllForUserAsync(userId, month, year,cancellationToken);
         var budgetDtos = new List<BudgetReadDto>();
 
         foreach (var budget in budgets)
@@ -64,7 +63,7 @@ public class BudgetService : IBudgetService
         if (budget == null)
             throw new NotFoundException("Budget", id);
 
-        return await MapToReadDtoAsync(budget, userId);
+        return await MapToReadDtoAsync(budget, userId,cancellationToken);
     }
 
     /// <summary>
@@ -87,7 +86,7 @@ public class BudgetService : IBudgetService
 
         foreach (var budget in budgets)
         {
-            var dto = await MapToReadDtoAsync(budget, userId);
+            var dto = await MapToReadDtoAsync(budget, userId,cancellationToken);
             budgetDtos.Add(dto);
 
             totalBudgeted += dto.Amount;
@@ -226,12 +225,6 @@ public class BudgetService : IBudgetService
         // Calculate spent amount for this category in this month/year
         var startDate = new DateTime(budget.Year, budget.Month, 1);
         var endDate = startDate.AddMonths(1).AddDays(-1);
-
-        await _unitOfWork.Transactions.GetTotalExpenseAsync(
-            userId,
-            startDate,
-            endDate, cancellationToken
-        );
 
         // Filter by category
         var categoryTransactions = await _unitOfWork.Transactions.GetPagedAsync(
