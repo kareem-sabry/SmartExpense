@@ -40,7 +40,7 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class, IEnti
 
     public virtual async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
-        var entity = await GetByIdAsync(id);
+        var entity = await GetByIdAsync(id, cancellationToken);
         if (entity != null) _dbSet.Remove(entity);
     }
 
