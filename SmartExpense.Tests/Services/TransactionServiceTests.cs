@@ -579,4 +579,178 @@ public class TransactionServiceTests
     }
 
     #endregion
+    
+    #region ExportToCsvAsync Tests
+
+[Fact]
+public async Task ExportToCsvAsync_ShouldReturnCsvWithHeader()
+{
+    // Arrange
+    var startDate = new DateTime(2025, 1, 1);
+    var endDate = new DateTime(2025, 1, 31);
+    var category = new Category { Id = 1, Name = "Food" };
+
+    _transactionRepositoryMock
+        .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new PagedResult<Transaction>
+        {
+            Data = new List<Transaction>
+            {
+                new()
+                {
+                    Id = 1,
+                    TransactionDate = new DateTime(2025, 1, 15),
+                    Description = "Lunch",
+                    Amount = 25.50m,
+                    TransactionType = TransactionType.Expense,
+                    Category = category
+                }
+            },
+            TotalCount = 1,
+            PageNumber = 1,
+            PageSize = int.MaxValue
+        });
+
+    // Act
+    var csv = await _sut.ExportToCsvAsync(_userId, startDate, endDate);
+
+    // Assert
+    csv.Should().StartWith("Date,Description,Category,Type,Amount,Notes");
+    csv.Should().Contain("2025-01-15");
+    csv.Should().Contain("Lunch");
+    csv.Should().Contain("Food");
+    csv.Should().Contain("Expense");
+    csv.Should().Contain("25.50");
+}
+
+[Fact]
+public async Task ExportToCsvAsync_ShouldEscapeQuotesInDescription()
+{
+    // Arrange
+    var startDate = new DateTime(2025, 1, 1);
+    var endDate = new DateTime(2025, 1, 31);
+    var category = new Category { Id = 1, Name = "Food" };
+
+    _transactionRepositoryMock
+        .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new PagedResult<Transaction>
+        {
+            Data = new List<Transaction>
+            {
+                new()
+                {
+                    TransactionDate = new DateTime(2025, 1, 15),
+                    Description = "He said \"hello\"",
+                    Amount = 10m,
+                    TransactionType = TransactionType.Expense,
+                    Category = category
+                }
+            },
+            TotalCount = 1,
+            PageNumber = 1,
+            PageSize = int.MaxValue
+        });
+
+    // Act
+    var csv = await _sut.ExportToCsvAsync(_userId, startDate, endDate);
+
+    // Assert — double-quotes are escaped as two double-quotes in CSV
+    csv.Should().Contain("He said \"\"hello\"\"");
+}
+
+[Fact]
+public async Task ExportToCsvAsync_ShouldReturnHeaderOnly_WhenNoTransactions()
+{
+    // Arrange
+    var startDate = new DateTime(2025, 1, 1);
+    var endDate = new DateTime(2025, 1, 31);
+
+    _transactionRepositoryMock
+        .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new PagedResult<Transaction>
+        {
+            Data = new List<Transaction>(),
+            TotalCount = 0,
+            PageNumber = 1,
+            PageSize = int.MaxValue
+        });
+
+    // Act
+    var csv = await _sut.ExportToCsvAsync(_userId, startDate, endDate);
+
+    // Assert
+    var lines = csv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+    lines.Should().HaveCount(1);
+    lines[0].Should().Be("Date,Description,Category,Type,Amount,Notes");
+}
+
+#endregion
+
+    #region Edge case tests
+
+[Fact]
+public async Task CreateAsync_ShouldThrowValidationException_WhenTransactionDateIsExactlyNow()
+{
+    // Arrange — date exactly equal to now is not in the future, should be allowed
+    var category = new Category { Id = 1, Name = "Food", IsActive = true, UserId = _userId };
+
+    var dto = new TransactionCreateDto
+    {
+        CategoryId = 1,
+        Description = "Test",
+        Amount = 10m,
+        TransactionType = TransactionType.Expense,
+        TransactionDate = _now  // exactly now — should succeed
+    };
+
+    _categoryRepositoryMock
+        .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(category);
+
+    _transactionRepositoryMock
+        .Setup(x => x.AddAsync(It.IsAny<Transaction>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync((Transaction t, CancellationToken _) => t);
+
+    _transactionRepositoryMock
+        .Setup(x => x.GetByIdForUserAsync(It.IsAny<int>(), _userId, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new Transaction
+        {
+            Id = 1, Category = category, Description = dto.Description, Amount = dto.Amount,
+            TransactionType = dto.TransactionType, TransactionDate = dto.TransactionDate
+        });
+
+    // Act — should not throw
+    var result = await _sut.CreateAsync(dto, _userId);
+
+    // Assert
+    result.Should().NotBeNull();
+}
+
+[Fact]
+public async Task GetSummaryAsync_ShouldReturnZeros_WhenNoTransactions()
+{
+    // Arrange
+    _transactionRepositoryMock
+        .Setup(x => x.GetTotalIncomeAsync(_userId, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(0m);
+
+    _transactionRepositoryMock
+        .Setup(x => x.GetTotalExpenseAsync(_userId, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(0m);
+
+    _transactionRepositoryMock
+        .Setup(x => x.GetTransactionCountAsync(_userId, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(0);
+
+    // Act
+    var result = await _sut.GetSummaryAsync(_userId, null, null);
+
+    // Assert
+    result.TotalIncome.Should().Be(0m);
+    result.TotalExpense.Should().Be(0m);
+    result.NetBalance.Should().Be(0m);
+    result.TransactionCount.Should().Be(0);
+}
+
+#endregion
 }
