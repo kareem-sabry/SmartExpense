@@ -141,9 +141,6 @@ public class TransactionService : ITransactionService
                     PageSize = pageSize
                 }, cancellationToken);
 
-            if (!result.Data.Any())
-                break;
-
             foreach (var t in result.Data)
                 sb.AppendLine(
                     $"{t.TransactionDate:yyyy-MM-dd}," +
@@ -152,6 +149,9 @@ public class TransactionService : ITransactionService
                     $"{t.TransactionType}," +
                     $"{t.Amount}," +
                     $"\"{EscapeCsv(t.Notes)}\"");
+
+            if (result.Data.Count < pageSize)  // ← last page reached
+                break;
 
             pageNumber++;
         }
