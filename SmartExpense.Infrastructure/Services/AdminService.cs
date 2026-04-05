@@ -6,7 +6,6 @@ using SmartExpense.Application.Interfaces;
 using SmartExpense.Core.Constants;
 using SmartExpense.Core.Entities;
 using SmartExpense.Core.Exceptions;
-using SmartExpense.Infrastructure.Data;
 using ValidationException = SmartExpense.Core.Exceptions.ValidationException;
 
 namespace SmartExpense.Infrastructure.Services;
@@ -15,36 +14,27 @@ public class AdminService : IAdminService
 {
     private readonly ILogger<AdminService> _logger;
     private readonly RoleManager<IdentityRole<Guid>> _roleManager;
-    private readonly AppDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<User> _userManager;
 
     public AdminService(UserManager<User> userManager, ILogger<AdminService> logger,
-        RoleManager<IdentityRole<Guid>> roleManager, AppDbContext context)
+        RoleManager<IdentityRole<Guid>> roleManager, IUnitOfWork unitOfWork)
     {
         _userManager = userManager;
         _logger = logger;
         _roleManager = roleManager;
-        _context = context;
+        _unitOfWork = unitOfWork;
     }
 
-    public async Task<IEnumerable<UserWithRolesDto>> GetAllUsersAsync()
+    public async Task<IEnumerable<UserWithRolesDto>> GetAllUsersAsync(CancellationToken cancellationToken = default)
     {
         var users = await _userManager.Users
             .Select(u => new { u.Id, u.Email, u.FirstName, u.LastName })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         var userIds = users.Select(u => u.Id).ToList();
 
-        var rolesByUser = await _context.UserRoles
-            .Where(ur => userIds.Contains(ur.UserId))
-            .Join(_context.Roles,
-                ur => ur.RoleId,
-                r => r.Id,
-                (ur, r) => new { ur.UserId, r.Name })
-            .GroupBy(x => x.UserId)
-            .ToDictionaryAsync(
-                g => g.Key,
-                g => g.Select(x => x.Name).OfType<string>().ToList());
+        var rolesByUser = await _unitOfWork.Users.GetRolesByUserIdsAsync(userIds, cancellationToken);
 
         return users.Select(user => new UserWithRolesDto
         {
@@ -56,7 +46,7 @@ public class AdminService : IAdminService
         });
     }
 
-    public async Task<UserWithRolesDto?> GetUserByIdAsync(Guid userId)
+    public async Task<UserWithRolesDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         ValidateGuid(userId, nameof(userId));
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -79,8 +69,7 @@ public class AdminService : IAdminService
         };
     }
 
-    public async Task<BasicResponse> MakeUserAdminAsync(Guid userId, string currentAdminEmail)
-    {
+    public async Task<BasicResponse> MakeUserAdminAsync(Guid userId, string currentAdminEmail, CancellationToken cancellationToken = default)    {
         ValidateGuid(userId, nameof(userId));
 
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -138,7 +127,7 @@ public class AdminService : IAdminService
         };
     }
 
-    public async Task<BasicResponse> RemoveAdminRoleAsync(Guid userId, Guid currentAdminId)
+    public async Task<BasicResponse> RemoveAdminRoleAsync(Guid userId, Guid currentAdminId, CancellationToken cancellationToken = default)
     {
         ValidateGuid(userId, nameof(userId));
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -211,7 +200,7 @@ public class AdminService : IAdminService
         };
     }
 
-    public async Task<BasicResponse> DeleteUserAsync(Guid userId, string currentAdminEmail)
+    public async Task<BasicResponse> DeleteUserAsync(Guid userId, string currentAdminEmail, CancellationToken cancellationToken = default)
     {
         ValidateGuid(userId, nameof(userId));
 

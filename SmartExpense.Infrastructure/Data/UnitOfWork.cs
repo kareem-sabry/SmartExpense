@@ -12,6 +12,7 @@ public class UnitOfWork : IUnitOfWork
     private IRecurringTransactionRepository? _recurringTransactions;
     private IDbContextTransaction? _transaction;
     private ITransactionRepository? _transactions;
+    private IUserRepository? _users;
 
     public UnitOfWork(AppDbContext context)
     {
@@ -29,6 +30,9 @@ public class UnitOfWork : IUnitOfWork
 
     public IRecurringTransactionRepository RecurringTransactions =>
         _recurringTransactions ??= new RecurringTransactionRepository(_context);
+
+    public IUserRepository Users =>
+        _users ??= new UserRepository(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

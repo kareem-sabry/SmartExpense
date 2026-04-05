@@ -35,7 +35,7 @@ public class AdminController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAllUsers(CancellationToken cancellationToken = default)
     {
-        var users = await _adminService.GetAllUsersAsync();
+        var users = await _adminService.GetAllUsersAsync(cancellationToken);
         return Ok(users);
     }
 
@@ -56,7 +56,7 @@ public class AdminController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUserById(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user = await _adminService.GetUserByIdAsync(userId);
+        var user = await _adminService.GetUserByIdAsync(userId, cancellationToken);
         return Ok(user);
     }
 
@@ -80,7 +80,7 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> MakeUserAdmin(Guid userId, CancellationToken cancellationToken = default)
     {
         var currentAdminEmail = User.FindFirstValue(ClaimTypes.Email)!;
-        var response = await _adminService.MakeUserAdminAsync(userId, currentAdminEmail);
+        var response = await _adminService.MakeUserAdminAsync(userId, currentAdminEmail, cancellationToken);
         return Ok(response);
     }
 
@@ -104,7 +104,7 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> RemoveAdminRole(Guid userId, CancellationToken cancellationToken = default)
     {
         var currentAdminId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var response = await _adminService.RemoveAdminRoleAsync(userId, currentAdminId);
+        var response = await _adminService.RemoveAdminRoleAsync(userId, currentAdminId, cancellationToken);
         return Ok(response);
     }
 
@@ -129,7 +129,7 @@ public class AdminController : ControllerBase
     public async Task<ActionResult> DeleteUser(Guid userId, CancellationToken cancellationToken = default)
     {
         var currentAdminEmail = User.FindFirstValue(ClaimTypes.Email)!;
-        var response = await _adminService.DeleteUserAsync(userId, currentAdminEmail);
+        var response = await _adminService.DeleteUserAsync(userId, currentAdminEmail, cancellationToken);
         return Ok(response);
     }
 }

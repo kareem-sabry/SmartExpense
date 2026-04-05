@@ -19,16 +19,16 @@ public class AccountService : IAccountService
     private readonly ILogger<AccountService> _logger;
     private readonly RoleManager<IdentityRole<Guid>> _roleManager;
     private readonly UserManager<User> _userManager;
-    private readonly IUserRepository _userRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AccountService(IAuthTokenProcessor authTokenProcessor, UserManager<User> userManager,
-        RoleManager<IdentityRole<Guid>> roleManager, IUserRepository userRepository,
+        RoleManager<IdentityRole<Guid>> roleManager, IUnitOfWork unitOfWork,
         ILogger<AccountService> logger, IDateTimeProvider dateTimeProvider, IEmailService emailService)
     {
         _authTokenProcessor = authTokenProcessor;
         _userManager = userManager;
         _roleManager = roleManager;
-        _userRepository = userRepository;
+        _unitOfWork = unitOfWork;
         _logger = logger;
         _dateTimeProvider = dateTimeProvider;
         _emailService = emailService;
@@ -195,7 +195,7 @@ public class AccountService : IAccountService
                 Message = ErrorMessages.RefreshTokenMissing
             };
 
-        var user = await _userRepository.GetUserByRefreshTokenAsync(refreshTokenRequest.RefreshToken);
+        var user = await _unitOfWork.Users.GetUserByRefreshTokenAsync(refreshTokenRequest.RefreshToken);
 
         if (user == null)
         {
