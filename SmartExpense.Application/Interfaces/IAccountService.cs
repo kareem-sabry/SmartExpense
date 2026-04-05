@@ -7,12 +7,12 @@ namespace SmartExpense.Application.Interfaces;
 
 public interface IAccountService
 {
-    Task<RegisterResponse> RegisterAsync(RegisterRequest registerRequest);
-    Task<LoginResponse> LoginAsync(LoginRequest request);
-    Task<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest refreshTokenRequest);
-    Task<LogoutResponse> LogoutAsync(string userEmail);
-    Task<UserProfileDto?> GetCurrentUserAsync(string userEmail);
-    Task<BasicResponse> ForgotPasswordAsync(ForgotPasswordRequest request);
-    Task<BasicResponse> ResetPasswordAsync(ResetPasswordRequest request);
-    Task<BasicResponse> DeleteMyAccountAsync(string userEmail);
+    Task<RegisterResponse> RegisterAsync(RegisterRequest registerRequest, CancellationToken cancellationToken = default);
+    Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
+    Task<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest refreshTokenRequest, CancellationToken cancellationToken = default);
+    Task<LogoutResponse> LogoutAsync(string userEmail, CancellationToken cancellationToken = default);
+    Task<UserProfileDto?> GetCurrentUserAsync(string userEmail, CancellationToken cancellationToken = default);
+    Task<BasicResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default);
+    Task<BasicResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default);
+    Task<BasicResponse> DeleteMyAccountAsync(string userEmail, CancellationToken cancellationToken = default);
 }
