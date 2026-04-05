@@ -154,6 +154,99 @@ public class TransactionRepository : GenericRepository<Transaction>, ITransactio
     }
 
     /// <inheritdoc />
+    public async Task<int> GetCountByTypeAsync(
+        Guid userId,
+        TransactionType type,
+        DateTime? startDate,
+        DateTime? endDate,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbSet
+            .AsNoTracking()
+            .Where(t => t.UserId == userId && t.TransactionType == type);
+
+        query = ApplyDateFilter(query, startDate, endDate);
+
+        return await query.CountAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<List<CategorySpendSummary>> GetCategorySpendSummaryAsync(
+        Guid userId,
+        DateTime startDate,
+        DateTime endDate,
+        TransactionType type,
+        CancellationToken cancellationToken = default)
+    {
+        // Step 1 — SQL GROUP BY: SUM + COUNT per CategoryId.
+        // Anonymous-type GroupBy is guaranteed to translate to SQL in EF Core.
+        var grouped = await _dbSet
+            .AsNoTracking()
+            .Where(t =>
+                t.UserId == userId &&
+                t.TransactionType == type &&
+                t.TransactionDate >= startDate &&
+                t.TransactionDate <= endDate)
+            .GroupBy(t => t.CategoryId)
+            .Select(g => new
+            {
+                CategoryId = g.Key,
+                TotalAmount = g.Sum(t => t.Amount),
+                TransactionCount = g.Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        if (grouped.Count == 0)
+            return [];
+
+        // Step 2 — One IN query for category metadata (name / icon / color).
+        var categoryIds = grouped.Select(g => g.CategoryId).ToList();
+        var categories = await _context.Set<Category>()
+            .AsNoTracking()
+            .Where(c => categoryIds.Contains(c.Id))
+            .Select(c => new { c.Id, c.Name, c.Icon, c.Color })
+            .ToListAsync(cancellationToken);
+        var categoryMap = categories.ToDictionary(c => c.Id);
+
+        // Step 3 — In-memory join of two small result sets.
+        return grouped
+            .Select(g =>
+            {
+                categoryMap.TryGetValue(g.CategoryId, out var cat);
+                return new CategorySpendSummary(
+                    g.CategoryId,
+                    cat?.Name ?? "Unknown",
+                    cat?.Icon,
+                    cat?.Color,
+                    g.TotalAmount,
+                    g.TransactionCount);
+            })
+            .ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<List<TransactionTrendProjection>> GetTrendProjectionsAsync(
+        Guid userId,
+        DateTime startDate,
+        DateTime endDate,
+        CancellationToken cancellationToken = default)
+    {
+        // SELECT TransactionDate, TransactionType, Amount WHERE ...
+        // EF Core projects these three columns; no entity graph is loaded.
+        return await _dbSet
+            .AsNoTracking()
+            .Where(t =>
+                t.UserId == userId &&
+                t.TransactionDate >= startDate &&
+                t.TransactionDate <= endDate)
+            .Select(t => new TransactionTrendProjection(
+                t.TransactionDate,
+                t.TransactionType,
+                t.Amount))
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<decimal> GetActualSpentAsync(
         Guid userId,
         int categoryId,
