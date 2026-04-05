@@ -304,8 +304,6 @@ builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
-// Repositories
-builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 // Token Processing
 builder.Services.AddScoped<IAuthTokenProcessor, AuthTokenProcessorService>();

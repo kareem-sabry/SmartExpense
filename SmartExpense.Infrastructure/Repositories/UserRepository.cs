@@ -16,7 +16,24 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetUserByRefreshTokenAsync(string refreshToken)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
-        return user;
+        return await _context.Users.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
+    }
+
+    public async Task<Dictionary<Guid, List<string>>> GetRolesByUserIdsAsync(
+        IReadOnlyList<Guid> userIds,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.UserRoles
+            .Where(ur => userIds.Contains(ur.UserId))
+            .Join(
+                _context.Roles,
+                ur => ur.RoleId,
+                r => r.Id,
+                (ur, r) => new { ur.UserId, r.Name })
+            .GroupBy(x => x.UserId)
+            .ToDictionaryAsync(
+                g => g.Key,
+                g => g.Select(x => x.Name).OfType<string>().ToList(),
+                cancellationToken);
     }
 }
