@@ -4,7 +4,6 @@ using SmartExpense.Application.Interfaces;
 using SmartExpense.Core.Entities;
 using SmartExpense.Core.Enums;
 using SmartExpense.Core.Exceptions;
-using SmartExpense.Core.Models;
 
 namespace SmartExpense.Infrastructure.Services;
 
@@ -36,7 +35,7 @@ public class BudgetService : IBudgetService
     public async Task<List<BudgetReadDto>> GetAllAsync(Guid userId, int? month, int? year,
         CancellationToken cancellationToken = default)
     {
-        var budgets = await _unitOfWork.Budgets.GetAllForUserAsync(userId, month, year,cancellationToken);
+        var budgets = await _unitOfWork.Budgets.GetAllForUserAsync(userId, month, year, cancellationToken);
         var budgetDtos = new List<BudgetReadDto>();
 
         foreach (var budget in budgets)
@@ -63,7 +62,7 @@ public class BudgetService : IBudgetService
         if (budget == null)
             throw new NotFoundException("Budget", id);
 
-        return await MapToReadDtoAsync(budget, userId,cancellationToken);
+        return await MapToReadDtoAsync(budget, userId, cancellationToken);
     }
 
     /// <summary>
@@ -86,7 +85,7 @@ public class BudgetService : IBudgetService
 
         foreach (var budget in budgets)
         {
-            var dto = await MapToReadDtoAsync(budget, userId,cancellationToken);
+            var dto = await MapToReadDtoAsync(budget, userId, cancellationToken);
             budgetDtos.Add(dto);
 
             totalBudgeted += dto.Amount;
@@ -226,20 +225,14 @@ public class BudgetService : IBudgetService
         var startDate = new DateTime(budget.Year, budget.Month, 1);
         var endDate = startDate.AddMonths(1).AddDays(-1);
 
-        // Filter by category
-        var categoryTransactions = await _unitOfWork.Transactions.GetPagedAsync(
+        // Single SQL SUM — no rows are loaded into memory
+        var actualSpent = await _unitOfWork.Transactions.GetActualSpentAsync(
             userId,
-            new TransactionQueryParameters
-            {
-                CategoryId = budget.CategoryId,
-                StartDate = startDate,
-                EndDate = endDate,
-                TransactionType = TransactionType.Expense,
-                PageSize = int.MaxValue
-            }, cancellationToken
-        );
+            budget.CategoryId,
+            startDate,
+            endDate,
+            cancellationToken);
 
-        var actualSpent = categoryTransactions.Data.Sum(t => t.Amount);
         var remaining = budget.Amount - actualSpent;
         var percentageUsed = budget.Amount > 0 ? actualSpent / budget.Amount * 100 : 0;
 

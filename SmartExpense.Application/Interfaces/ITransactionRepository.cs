@@ -21,4 +21,10 @@ public interface ITransactionRepository : IGenericRepository<Transaction>
 
     Task<Transaction?> GetByIdForUserAsync(int id, Guid userId, CancellationToken cancellationToken = default);
     Task<bool> ExistsForRecurringOnDateAsync(int recurringTransactionId, DateTime date, CancellationToken cancellationToken = default);
+    Task<decimal> GetActualSpentAsync(
+        Guid userId,
+        int categoryId,
+        DateTime startDate,
+        DateTime endDate,
+        CancellationToken cancellationToken = default);
 }
