@@ -43,24 +43,23 @@ public class AnalyticsService : IAnalyticsService
         DateTime startDate,
         DateTime endDate, CancellationToken cancellationToken = default)
     {
-        var totalIncome = await _unitOfWork.Transactions.GetTotalIncomeAsync(userId, startDate, endDate, cancellationToken);
-        var totalExpense = await _unitOfWork.Transactions.GetTotalExpenseAsync(userId, startDate, endDate, cancellationToken);
-        var transactionCount = await _unitOfWork.Transactions.GetTransactionCountAsync(userId, startDate, endDate, cancellationToken);
+        var totalIncome =
+            await _unitOfWork.Transactions.GetTotalIncomeAsync(userId, startDate, endDate, cancellationToken);
+        var totalExpense =
+            await _unitOfWork.Transactions.GetTotalExpenseAsync(userId, startDate, endDate, cancellationToken);
+        var transactionCount =
+            await _unitOfWork.Transactions.GetTransactionCountAsync(userId, startDate, endDate, cancellationToken);
 
-        var allTransactions = await _unitOfWork.Transactions.GetPagedAsync(userId, new TransactionQueryParameters
-        {
-            StartDate = startDate,
-            EndDate = endDate,
-            PageSize = int.MaxValue
-        }, cancellationToken);
-
-        var incomeCount = allTransactions.Data.Count(t => t.TransactionType == TransactionType.Income);
-        var expenseCount = allTransactions.Data.Count(t => t.TransactionType == TransactionType.Expense);
+        var incomeCount = await _unitOfWork.Transactions.GetCountByTypeAsync(
+            userId, TransactionType.Income, startDate, endDate, cancellationToken);
+        var expenseCount = await _unitOfWork.Transactions.GetCountByTypeAsync(
+            userId, TransactionType.Expense, startDate, endDate, cancellationToken);
 
         var days = (endDate - startDate).Days + 1;
         var savingsRate = totalIncome > 0 ? (totalIncome - totalExpense) / totalIncome * 100 : 0;
 
-        var topExpenseCategories = await GetTopCategoriesAsync(userId, startDate, endDate, cancellationToken: cancellationToken);
+        var topExpenseCategories =
+            await GetTopCategoriesAsync(userId, startDate, endDate, cancellationToken: cancellationToken);
         var topIncomeCategories = await GetTopCategoriesAsync(userId, startDate, endDate, 5, false, cancellationToken);
 
         var dailyTrend = await GetSpendingTrendsAsync(userId, startDate, endDate, "daily", cancellationToken);
@@ -101,19 +100,15 @@ public class AnalyticsService : IAnalyticsService
         DateTime endDate,
         string groupBy = "monthly", CancellationToken cancellationToken = default)
     {
-        var allTransactions = await _unitOfWork.Transactions.GetPagedAsync(userId, new TransactionQueryParameters
-        {
-            StartDate = startDate,
-            EndDate = endDate,
-            PageSize = int.MaxValue
-        }, cancellationToken);
+        var projections = await _unitOfWork.Transactions.GetTrendProjectionsAsync(
+            userId, startDate, endDate, cancellationToken);
 
         var trends = groupBy.ToLower() switch
         {
-            "daily" => GroupByDay(allTransactions.Data, startDate, endDate),
-            "weekly" => GroupByWeek(allTransactions.Data, startDate, endDate),
-            "monthly" => GroupByMonth(allTransactions.Data, startDate, endDate),
-            _ => GroupByMonth(allTransactions.Data, startDate, endDate)
+            "daily" => GroupByDay(projections, startDate, endDate),
+            "weekly" => GroupByWeek(projections, startDate, endDate),
+            "monthly" => GroupByMonth(projections, startDate, endDate),
+            _ => GroupByMonth(projections, startDate, endDate)
         };
 
         return trends;
@@ -139,32 +134,24 @@ public class AnalyticsService : IAnalyticsService
     {
         var transactionType = expenseOnly ? TransactionType.Expense : TransactionType.Income;
 
-        var transactions = await _unitOfWork.Transactions.GetPagedAsync(userId, new TransactionQueryParameters
-        {
-            StartDate = startDate,
-            EndDate = endDate,
-            TransactionType = transactionType,
-            PageSize = int.MaxValue
-        }, cancellationToken);
+        var summary = await _unitOfWork.Transactions.GetCategorySpendSummaryAsync(
+            userId, startDate, endDate, transactionType, cancellationToken);
 
-        var total = transactions.Data.Sum(t => t.Amount);
+        var total = summary.Sum(s => s.TotalAmount);
 
-        var breakdown = transactions.Data
-            .GroupBy(t => new { t.CategoryId, t.Category?.Name, t.Category?.Icon, t.Category?.Color })
-            .Select(g => new CategoryBreakdownDto
+        return summary
+            .Select(s => new CategoryBreakdownDto
             {
-                CategoryId = g.Key.CategoryId,
-                CategoryName = g.Key.Name ?? "Unknown",
-                CategoryIcon = g.Key.Icon,
-                CategoryColor = g.Key.Color,
-                TotalAmount = g.Sum(t => t.Amount),
-                Percentage = total > 0 ? Math.Round(g.Sum(t => t.Amount) / total * 100, 2) : 0,
-                TransactionCount = g.Count()
+                CategoryId = s.CategoryId,
+                CategoryName = s.CategoryName,
+                CategoryIcon = s.CategoryIcon,
+                CategoryColor = s.CategoryColor,
+                TotalAmount = s.TotalAmount,
+                Percentage = total > 0 ? Math.Round(s.TotalAmount / total * 100, 2) : 0,
+                TransactionCount = s.TransactionCount
             })
             .OrderByDescending(c => c.TotalAmount)
             .ToList();
-
-        return breakdown;
     }
 
     /// <summary>
@@ -190,9 +177,12 @@ public class AnalyticsService : IAnalyticsService
             var startDate = new DateTime(targetDate.Year, targetDate.Month, 1);
             var endDate = startDate.AddMonths(1).AddDays(-1);
 
-            var income = await _unitOfWork.Transactions.GetTotalIncomeAsync(userId, startDate, endDate, cancellationToken);
-            var expense = await _unitOfWork.Transactions.GetTotalExpenseAsync(userId, startDate, endDate, cancellationToken);
-            var count = await _unitOfWork.Transactions.GetTransactionCountAsync(userId, startDate, endDate, cancellationToken);
+            var income =
+                await _unitOfWork.Transactions.GetTotalIncomeAsync(userId, startDate, endDate, cancellationToken);
+            var expense =
+                await _unitOfWork.Transactions.GetTotalExpenseAsync(userId, startDate, endDate, cancellationToken);
+            var count = await _unitOfWork.Transactions.GetTransactionCountAsync(userId, startDate, endDate,
+                cancellationToken);
 
             comparisons.Add(new MonthlyComparisonDto
             {
@@ -245,16 +235,8 @@ public class AnalyticsService : IAnalyticsService
 
         foreach (var budget in budgets)
         {
-            var transactions = await _unitOfWork.Transactions.GetPagedAsync(userId, new TransactionQueryParameters
-            {
-                CategoryId = budget.CategoryId,
-                StartDate = startDate,
-                EndDate = endDate,
-                TransactionType = TransactionType.Expense,
-                PageSize = int.MaxValue
-            }, cancellationToken);
-
-            var actualSpent = transactions.Data.Sum(t => t.Amount);
+            var actualSpent = await _unitOfWork.Transactions.GetActualSpentAsync(
+                userId, budget.CategoryId, startDate, endDate, cancellationToken);
             var percentageUsed = budget.Amount > 0 ? actualSpent / budget.Amount * 100 : 0;
 
             var status = percentageUsed >= 100 ? "Exceeded" :
@@ -308,37 +290,31 @@ public class AnalyticsService : IAnalyticsService
     {
         var transactionType = expenseOnly ? TransactionType.Expense : TransactionType.Income;
 
-        var transactions = await _unitOfWork.Transactions.GetPagedAsync(userId, new TransactionQueryParameters
-        {
-            StartDate = startDate,
-            EndDate = endDate,
-            TransactionType = transactionType,
-            PageSize = int.MaxValue
-        }, cancellationToken);
+        var summary = await _unitOfWork.Transactions.GetCategorySpendSummaryAsync(
+            userId, startDate, endDate, transactionType, cancellationToken);
 
-        var topCategories = transactions.Data
-            .GroupBy(t => new { t.CategoryId, t.Category?.Name, t.Category?.Icon, t.Category?.Color })
-            .Select(g => new TopCategoryDto
+        return summary
+            .Select(s => new TopCategoryDto
             {
-                CategoryId = g.Key.CategoryId,
-                CategoryName = g.Key.Name ?? "Unknown",
-                CategoryIcon = g.Key.Icon,
-                CategoryColor = g.Key.Color,
-                TotalAmount = g.Sum(t => t.Amount),
-                TransactionCount = g.Count(),
-                AverageTransaction = g.Average(t => t.Amount)
+                CategoryId = s.CategoryId,
+                CategoryName = s.CategoryName,
+                CategoryIcon = s.CategoryIcon,
+                CategoryColor = s.CategoryColor,
+                TotalAmount = s.TotalAmount,
+                TransactionCount = s.TransactionCount,
+                AverageTransaction = s.TransactionCount > 0
+                    ? Math.Round(s.TotalAmount / s.TransactionCount, 2)
+                    : 0
             })
             .OrderByDescending(c => c.TotalAmount)
             .Take(count)
             .ToList();
-
-        return topCategories;
     }
 
     #region Private Helper Methods
 
     private static List<SpendingTrendDto> GroupByDay(
-        List<Transaction> transactions,
+        List<TransactionTrendProjection> transactions,
         DateTime startDate,
         DateTime endDate)
     {
@@ -370,7 +346,7 @@ public class AnalyticsService : IAnalyticsService
     }
 
     private static List<SpendingTrendDto> GroupByWeek(
-        List<Transaction> transactions,
+        List<TransactionTrendProjection> transactions,
         DateTime startDate,
         DateTime endDate)
     {
@@ -409,7 +385,7 @@ public class AnalyticsService : IAnalyticsService
     }
 
     private static List<SpendingTrendDto> GroupByMonth(
-        List<Transaction> transactions,
+        List<TransactionTrendProjection> transactions,
         DateTime startDate,
         DateTime endDate)
     {
