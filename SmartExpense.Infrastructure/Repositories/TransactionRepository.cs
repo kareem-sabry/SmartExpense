@@ -153,6 +153,25 @@ public class TransactionRepository : GenericRepository<Transaction>, ITransactio
             t.TransactionDate.Date == date.Date, cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task<decimal> GetActualSpentAsync(
+        Guid userId,
+        int categoryId,
+        DateTime startDate,
+        DateTime endDate,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .Where(t =>
+                t.UserId == userId &&
+                t.CategoryId == categoryId &&
+                t.TransactionType == TransactionType.Expense &&
+                t.TransactionDate >= startDate &&
+                t.TransactionDate <= endDate)
+            .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0;
+    }
+
     #region Private Helper Methods
 
     /// <summary>
