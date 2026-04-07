@@ -77,28 +77,16 @@ public class BudgetServiceTests
             .Setup(x => x.GetByMonthYearAsync(_userId, 2, 2025, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budgets);
 
-        // Setup different spending for each category
+        // Setup actual spending per category via SQL aggregate
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.Is<TransactionQueryParameters>(p => p.CategoryId == 1),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction>
-            {
-                Data = new List<Transaction>
-                {
-                    new() { Amount = 450m, TransactionType = TransactionType.Expense } // 90% - Approaching
-                }
-            });
+            .Setup(x => x.GetActualSpentAsync(_userId, 1,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(450m); // 90% of 500 → Approaching
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.Is<TransactionQueryParameters>(p => p.CategoryId == 2),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction>
-            {
-                Data = new List<Transaction>
-                {
-                    new() { Amount = 350m, TransactionType = TransactionType.Expense } // 116% - Exceeded
-                }
-            });
+            .Setup(x => x.GetActualSpentAsync(_userId, 2,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(350m); // 116% of 300 → Exceeded
 
         // Act
         var result = await _sut.GetSummaryAsync(_userId, 2, 2025);
@@ -142,24 +130,11 @@ public class BudgetServiceTests
             .Setup(x => x.GetAllForUserAsync(_userId, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budgets);
 
-        // Setup transaction repository to return spent amount
-        var pagedTransactions = new PagedResult<Transaction>
-        {
-            Data = new List<Transaction>
-            {
-                new()
-                {
-                    Id = 1,
-                    Amount = 150m,
-                    TransactionType = TransactionType.Expense,
-                    CategoryId = 1
-                }
-            }
-        };
-
+        // Setup actual spending via SQL aggregate
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(pagedTransactions);
+            .Setup(x => x.GetActualSpentAsync(_userId, 1,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(150m);
 
         // Act
         var result = await _sut.GetAllAsync(_userId, null, null);
@@ -592,16 +567,11 @@ public class BudgetServiceTests
             .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budget);
 
-        // 85% spent
+        // 85% spent (425 / 500)
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction>
-            {
-                Data = new List<Transaction>
-                {
-                    new() { Amount = 425m, TransactionType = TransactionType.Expense }
-                }
-            });
+            .Setup(x => x.GetActualSpentAsync(_userId, 1,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(425m);
 
         // Act
         var result = await _sut.GetByIdAsync(1, _userId);
@@ -632,16 +602,11 @@ public class BudgetServiceTests
             .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budget);
 
-        // 120% spent (exceeded)
+        // 120% spent (600 / 500)
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction>
-            {
-                Data = new List<Transaction>
-                {
-                    new() { Amount = 600m, TransactionType = TransactionType.Expense }
-                }
-            });
+            .Setup(x => x.GetActualSpentAsync(_userId, 1,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(600m);
 
         // Act
         var result = await _sut.GetByIdAsync(1, _userId);
@@ -673,16 +638,11 @@ public class BudgetServiceTests
             .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(budget);
 
-        // 30% spent
+        // 30% spent (150 / 500)
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction>
-            {
-                Data = new List<Transaction>
-                {
-                    new() { Amount = 150m, TransactionType = TransactionType.Expense }
-                }
-            });
+            .Setup(x => x.GetActualSpentAsync(_userId, 1,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(150m);
 
         // Act
         var result = await _sut.GetByIdAsync(1, _userId);

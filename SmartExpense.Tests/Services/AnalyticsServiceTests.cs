@@ -82,12 +82,23 @@ public class AnalyticsServiceTests
             .ReturnsAsync(2);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction>
-            {
-                Data = transactions,
-                TotalCount = 2
-            });
+            .Setup(x => x.GetCountByTypeAsync(_userId, TransactionType.Income, startDate, endDate,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetCountByTypeAsync(_userId, TransactionType.Expense, startDate, endDate,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetCategorySpendSummaryAsync(_userId, startDate, endDate,
+                It.IsAny<TransactionType>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CategorySpendSummary>());
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetTrendProjectionsAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TransactionTrendProjection>());
 
         // Act
         var result = await _sut.GetFinancialOverviewAsync(_userId, startDate, endDate);
@@ -123,8 +134,18 @@ public class AnalyticsServiceTests
             .ReturnsAsync(10);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
+            .Setup(x => x.GetCountByTypeAsync(_userId, It.IsAny<TransactionType>(), startDate, endDate,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetCategorySpendSummaryAsync(_userId, startDate, endDate,
+                It.IsAny<TransactionType>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CategorySpendSummary>());
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetTrendProjectionsAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TransactionTrendProjection>());
 
         // Act
         var result = await _sut.GetFinancialOverviewAsync(_userId, startDate, endDate);
@@ -144,29 +165,13 @@ public class AnalyticsServiceTests
         var startDate = new DateTime(2025, 1, 1);
         var endDate = new DateTime(2025, 2, 28);
 
-        var category = new Category { Id = 1, Name = "Food" };
-
-        var transactions = new List<Transaction>
-        {
-            new()
-            {
-                Amount = 100m,
-                TransactionType = TransactionType.Expense,
-                TransactionDate = new DateTime(2025, 1, 15),
-                Category = category
-            },
-            new()
-            {
-                Amount = 200m,
-                TransactionType = TransactionType.Expense,
-                TransactionDate = new DateTime(2025, 2, 15),
-                Category = category
-            }
-        };
-
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
+            .Setup(x => x.GetTrendProjectionsAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TransactionTrendProjection>
+            {
+                new(new DateTime(2025, 1, 15), TransactionType.Expense, 100m),
+                new(new DateTime(2025, 2, 15), TransactionType.Expense, 200m)
+            });
 
         // Act
         var result = await _sut.GetSpendingTrendsAsync(_userId, startDate, endDate);
@@ -186,29 +191,13 @@ public class AnalyticsServiceTests
         var startDate = new DateTime(2025, 1, 1);
         var endDate = new DateTime(2025, 1, 3);
 
-        var category = new Category { Id = 1, Name = "Food" };
-
-        var transactions = new List<Transaction>
-        {
-            new()
-            {
-                Amount = 50m,
-                TransactionType = TransactionType.Expense,
-                TransactionDate = new DateTime(2025, 1, 1),
-                Category = category
-            },
-            new()
-            {
-                Amount = 75m,
-                TransactionType = TransactionType.Expense,
-                TransactionDate = new DateTime(2025, 1, 2),
-                Category = category
-            }
-        };
-
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
+            .Setup(x => x.GetTrendProjectionsAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TransactionTrendProjection>
+            {
+                new(new DateTime(2025, 1, 1), TransactionType.Expense, 50m),
+                new(new DateTime(2025, 1, 2), TransactionType.Expense, 75m)
+            });
 
         // Act
         var result = await _sut.GetSpendingTrendsAsync(_userId, startDate, endDate, "daily");
@@ -231,30 +220,14 @@ public class AnalyticsServiceTests
         var startDate = new DateTime(2025, 1, 1);
         var endDate = new DateTime(2025, 1, 31);
 
-        var category1 = new Category { Id = 1, Name = "Food", Icon = "🍔" };
-        var category2 = new Category { Id = 2, Name = "Transport", Icon = "🚗" };
-
-        var transactions = new List<Transaction>
-        {
-            new()
-            {
-                Amount = 300m,
-                TransactionType = TransactionType.Expense,
-                CategoryId = 1,
-                Category = category1
-            },
-            new()
-            {
-                Amount = 700m,
-                TransactionType = TransactionType.Expense,
-                CategoryId = 2,
-                Category = category2
-            }
-        };
-
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
+            .Setup(x => x.GetCategorySpendSummaryAsync(_userId, startDate, endDate,
+                TransactionType.Expense, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CategorySpendSummary>
+            {
+                new(1, "Food", "🍔", null, 300m, 1),
+                new(2, "Transport", "🚗", null, 700m, 1)
+            });
 
         // Act
         var result = await _sut.GetCategoryBreakdownAsync(_userId, startDate, endDate);
@@ -276,33 +249,18 @@ public class AnalyticsServiceTests
         var startDate = new DateTime(2025, 1, 1);
         var endDate = new DateTime(2025, 1, 31);
 
-        var category = new Category { Id = 1, Name = "Salary" };
-
-        var transactions = new List<Transaction>
-        {
-            new()
-            {
-                Amount = 1000m,
-                TransactionType = TransactionType.Expense,
-                CategoryId = 1,
-                Category = category
-            }
-        };
-
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId,
-                It.Is<TransactionQueryParameters>(p => p.TransactionType == TransactionType.Expense),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
+            .Setup(x => x.GetCategorySpendSummaryAsync(_userId, startDate, endDate,
+                TransactionType.Expense, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CategorySpendSummary>());
 
         // Act
         await _sut.GetCategoryBreakdownAsync(_userId, startDate, endDate);
 
         // Assert
         _transactionRepositoryMock.Verify(
-            x => x.GetPagedAsync(_userId,
-                It.Is<TransactionQueryParameters>(p => p.TransactionType == TransactionType.Expense),
-                It.IsAny<CancellationToken>()), Times.Once);
+            x => x.GetCategorySpendSummaryAsync(_userId, startDate, endDate,
+                TransactionType.Expense, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -390,23 +348,14 @@ public class AnalyticsServiceTests
             Category = category
         };
 
-        var transactions = new List<Transaction>
-        {
-            new()
-            {
-                Amount = 425m,
-                TransactionType = TransactionType.Expense,
-                CategoryId = 1
-            }
-        };
-
         _budgetRepositoryMock
             .Setup(x => x.GetByMonthYearAsync(_userId, month, year, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Budget> { budget });
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
+            .Setup(x => x.GetActualSpentAsync(_userId, budget.CategoryId,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(425m);
 
         // Act
         var result = await _sut.GetBudgetPerformanceAsync(_userId, month, year);
@@ -439,23 +388,14 @@ public class AnalyticsServiceTests
             Category = category
         };
 
-        var transactions = new List<Transaction>
-        {
-            new()
-            {
-                Amount = 600m,
-                TransactionType = TransactionType.Expense,
-                CategoryId = 1
-            }
-        };
-
         _budgetRepositoryMock
             .Setup(x => x.GetByMonthYearAsync(_userId, month, year, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Budget> { budget });
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
+            .Setup(x => x.GetActualSpentAsync(_userId, budget.CategoryId,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(600m);
 
         // Act
         var result = await _sut.GetBudgetPerformanceAsync(_userId, month, year);
@@ -476,38 +416,15 @@ public class AnalyticsServiceTests
         var startDate = new DateTime(2025, 1, 1);
         var endDate = new DateTime(2025, 1, 31);
 
-        var category1 = new Category { Id = 1, Name = "Food", Icon = "🍔" };
-        var category2 = new Category { Id = 2, Name = "Transport", Icon = "🚗" };
-        var category3 = new Category { Id = 3, Name = "Shopping", Icon = "🛒" };
-
-        var transactions = new List<Transaction>
-        {
-            new()
-            {
-                Amount = 100m,
-                TransactionType = TransactionType.Expense,
-                CategoryId = 1,
-                Category = category1
-            },
-            new()
-            {
-                Amount = 300m,
-                TransactionType = TransactionType.Expense,
-                CategoryId = 2,
-                Category = category2
-            },
-            new()
-            {
-                Amount = 200m,
-                TransactionType = TransactionType.Expense,
-                CategoryId = 3,
-                Category = category3
-            }
-        };
-
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
+            .Setup(x => x.GetCategorySpendSummaryAsync(_userId, startDate, endDate,
+                TransactionType.Expense, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CategorySpendSummary>
+            {
+                new(1, "Food", "🍔", null, 100m, 1),
+                new(2, "Transport", "🚗", null, 300m, 1),
+                new(3, "Shopping", "🛒", null, 200m, 1)
+            });
 
         // Act
         var result = await _sut.GetTopCategoriesAsync(_userId, startDate, endDate, 3);
@@ -529,20 +446,15 @@ public class AnalyticsServiceTests
         var startDate = new DateTime(2025, 1, 1);
         var endDate = new DateTime(2025, 1, 31);
 
-        var category1 = new Category { Id = 1, Name = "Food" };
-        var category2 = new Category { Id = 2, Name = "Transport" };
-        var category3 = new Category { Id = 3, Name = "Shopping" };
-
-        var transactions = new List<Transaction>
-        {
-            new() { Amount = 100m, TransactionType = TransactionType.Expense, CategoryId = 1, Category = category1 },
-            new() { Amount = 200m, TransactionType = TransactionType.Expense, CategoryId = 2, Category = category2 },
-            new() { Amount = 300m, TransactionType = TransactionType.Expense, CategoryId = 3, Category = category3 }
-        };
-
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
+            .Setup(x => x.GetCategorySpendSummaryAsync(_userId, startDate, endDate,
+                TransactionType.Expense, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CategorySpendSummary>
+            {
+                new(1, "Food", null, null, 100m, 1),
+                new(2, "Transport", null, null, 200m, 1),
+                new(3, "Shopping", null, null, 300m, 1)
+            });
 
         // Act
         var result = await _sut.GetTopCategoriesAsync(_userId, startDate, endDate, 2);
@@ -558,18 +470,13 @@ public class AnalyticsServiceTests
         var startDate = new DateTime(2025, 1, 1);
         var endDate = new DateTime(2025, 1, 31);
 
-        var category = new Category { Id = 1, Name = "Food" };
-
-        var transactions = new List<Transaction>
-        {
-            new() { Amount = 50m, TransactionType = TransactionType.Expense, CategoryId = 1, Category = category },
-            new() { Amount = 100m, TransactionType = TransactionType.Expense, CategoryId = 1, Category = category },
-            new() { Amount = 150m, TransactionType = TransactionType.Expense, CategoryId = 1, Category = category }
-        };
-
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = transactions });
+            .Setup(x => x.GetCategorySpendSummaryAsync(_userId, startDate, endDate,
+                TransactionType.Expense, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CategorySpendSummary>
+            {
+                new(1, "Food", null, null, 300m, 3) // 50+100+150 = 300 total; count = 3; avg = 100
+            });
 
         // Act
         var result = await _sut.GetTopCategoriesAsync(_userId, startDate, endDate);
