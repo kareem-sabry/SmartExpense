@@ -286,30 +286,38 @@ public class AccountService : IAccountService
             };
         }
 
-        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var rawToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+        // ASP.NET Identity tokens contain '+', '/', '=' which some email clients
+        // silently modify or line-wrap. URL-encode so the token survives the round-trip.
+        var encodedToken = Uri.EscapeDataString(rawToken);
+        var encodedEmail = Uri.EscapeDataString(user.Email!);
+
+        // Build a deep-link that your frontend can consume directly.
+        // Replace the base URL with your actual frontend origin in production.
+        var resetLink =
+            $"https://app.smartexpense.com/reset-password?token={encodedToken}&email={encodedEmail}";
 
         var emailBody = $"""
                          Hello {user.FirstName},
 
-                         You requested to reset your password for SmartExpense.Api.
+                         You requested to reset your password for SmartExpense.
 
-                         Please use the following token to reset your password:
+                         Click the link below to reset your password (valid for {ApplicationConstants.PasswordResetTokenExpirationHours} hours):
 
-                         {token}
+                         {resetLink}
 
-                         This token will expire in {ApplicationConstants.PasswordResetTokenExpirationHours} hours.
+                         If you didn't request this reset, you can safely ignore this email.
+                         Your password will not change unless you click the link above.
 
-                         If you didn't request this password reset, please ignore this email and your password will remain unchanged.
-
-                         For security reasons, never share this token with anyone.
+                         For security reasons, never share this link with anyone.
 
                          Best regards,
-                         SmartExpense.Api Support Team
+                         SmartExpense Support Team
                          """;
 
         await _emailService.SendEmailAsync(
             user.Email!,
-            "SmartExpense.Api Password Reset",
+            "SmartExpense Password Reset",
             emailBody
         );
         _logger.LogInformation("Password reset email sent to: {Email}", user.Email);
@@ -337,7 +345,9 @@ public class AccountService : IAccountService
             };
         }
 
-        var result = await _userManager.ResetPasswordAsync(user, request.ResetCode, request.NewPassword);
+        // Decode the token that arrived URL-encoded from the email link.
+        var decodedToken = Uri.UnescapeDataString(request.ResetCode);
+        var result = await _userManager.ResetPasswordAsync(user, decodedToken, request.NewPassword);
 
         if (!result.Succeeded)
         {
