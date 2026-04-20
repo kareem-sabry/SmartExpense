@@ -1,5 +1,5 @@
 # ── Build stage ──────────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Copy project files first — lets Docker cache the restore layer
@@ -21,7 +21,7 @@ RUN dotnet publish "SmartExpense.Api.csproj" -c Release -o /app/publish \
     --no-restore /p:UseAppHost=false
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 
 # Non-root user for security

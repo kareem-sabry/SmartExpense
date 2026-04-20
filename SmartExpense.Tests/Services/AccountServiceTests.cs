@@ -79,7 +79,7 @@ public class AccountServiceTests
     // ═════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task RegisterAsync_WithValidRequest_ReturnsSuccess()
+    public async Task RegisterAsync_WithValidRequest_CreatesUserCorrectly()
     {
         // Arrange
         var request = new RegisterRequest
@@ -91,6 +91,8 @@ public class AccountServiceTests
             Role = Role.User
         };
 
+        User? createdUser = null;
+
         _userManagerMock.Setup(x => x.FindByEmailAsync(request.Email))
             .ReturnsAsync((User?)null);
 
@@ -98,6 +100,7 @@ public class AccountServiceTests
             .ReturnsAsync(true);
 
         _userManagerMock.Setup(x => x.CreateAsync(It.IsAny<User>(), request.Password))
+            .Callback<User, string>((u, _) => createdUser = u)
             .ReturnsAsync(IdentityResult.Success);
 
         _userManagerMock.Setup(x => x.AddToRoleAsync(It.IsAny<User>(), IdentityRoleConstants.User))
@@ -108,7 +111,12 @@ public class AccountServiceTests
 
         // Assert
         result.Succeeded.Should().BeTrue();
-        result.Message.Should().Be(SuccessMessages.RegistrationSuccessful);
+
+        createdUser.Should().NotBeNull();
+        createdUser!.Email.Should().Be(request.Email);
+        createdUser.FirstName.Should().Be(request.FirstName);
+        createdUser.LastName.Should().Be(request.LastName);
+        createdUser.CreatedAtUtc.Should().Be(_fixedNow);
     }
 
     [Fact]
