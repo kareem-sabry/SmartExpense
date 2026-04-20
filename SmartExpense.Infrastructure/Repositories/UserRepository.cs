@@ -14,10 +14,19 @@ public class UserRepository : IUserRepository
         _context = context;
     }
 
-    public async Task<User?> GetUserByRefreshTokenAsync(string refreshToken,
+    public async Task<User?> GetUserByRefreshTokenAsync(string hashedToken,
         CancellationToken cancellationToken = default)
     {
-        return await _context.Users.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken, cancellationToken);
+        return await _context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.RefreshToken == hashedToken, cancellationToken);
+    }
+
+    public async Task<User?> GetUserByPreviousRefreshTokenHashAsync(string hashedToken,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Users
+            .FirstOrDefaultAsync(u => u.PreviousRefreshTokenHash == hashedToken, cancellationToken);
     }
 
     public async Task<Dictionary<Guid, List<string>>> GetRolesByUserIdsAsync(
