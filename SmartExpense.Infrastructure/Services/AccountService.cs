@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.Extensions.Logging;
 using SmartExpense.Application.Dtos.Auth;
@@ -34,7 +36,8 @@ public class AccountService : IAccountService
         _emailService = emailService;
     }
 
-public async Task<RegisterResponse> RegisterAsync(RegisterRequest registerRequest, CancellationToken cancellationToken = default)
+    public async Task<RegisterResponse> RegisterAsync(RegisterRequest registerRequest,
+        CancellationToken cancellationToken = default)
     {
         var userExists = await _userManager.FindByEmailAsync(registerRequest.Email) != null;
 
@@ -109,7 +112,8 @@ public async Task<RegisterResponse> RegisterAsync(RegisterRequest registerReques
         };
     }
 
-public async Task<LoginResponse> LoginAsync(LoginRequest loginRequest, CancellationToken cancellationToken = default)
+    public async Task<LoginResponse> LoginAsync(LoginRequest loginRequest,
+        CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByEmailAsync(loginRequest.Email);
         if (user == null || !await _userManager.CheckPasswordAsync(user, loginRequest.Password))
@@ -128,11 +132,13 @@ public async Task<LoginResponse> LoginAsync(LoginRequest loginRequest, Cancellat
         var (jwtToken, expirationDateInUtc) = _authTokenProcessor.GenerateJwtToken(user, roles);
 
         var refreshTokenValue = _authTokenProcessor.GenerateRefreshToken();
+        var hashedRefreshToken = HashToken(refreshTokenValue);
 
         var refreshTokenExpirationDateInUtc =
             _dateTimeProvider.UtcNow.AddDays(ApplicationConstants.RefreshTokenExpirationDays);
 
-        user.RefreshToken = refreshTokenValue;
+        user.RefreshToken = hashedRefreshToken;
+        user.PreviousRefreshTokenHash = null; // fresh login resets reuse-detection state
         user.RefreshTokenExpiresAtUtc = refreshTokenExpirationDateInUtc;
 
         await _userManager.UpdateAsync(user);
@@ -144,11 +150,12 @@ public async Task<LoginResponse> LoginAsync(LoginRequest loginRequest, Cancellat
             Message = SuccessMessages.LoginSuccessful,
             AccessToken = jwtToken,
             ExpiresAtUtc = expirationDateInUtc,
-            RefreshToken = refreshTokenValue
+            RefreshToken = refreshTokenValue // plain token goes to client only
         };
     }
 
-public async Task<BasicResponse> DeleteMyAccountAsync(string userEmail, CancellationToken cancellationToken = default)
+    public async Task<BasicResponse> DeleteMyAccountAsync(string userEmail,
+        CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByEmailAsync(userEmail);
 
@@ -186,7 +193,8 @@ public async Task<BasicResponse> DeleteMyAccountAsync(string userEmail, Cancella
         };
     }
 
-public async Task<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest refreshTokenRequest, CancellationToken cancellationToken = default)
+    public async Task<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest refreshTokenRequest,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(refreshTokenRequest.RefreshToken))
             return new RefreshTokenResponse
@@ -195,11 +203,29 @@ public async Task<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest re
                 Message = ErrorMessages.RefreshTokenMissing
             };
 
-var user = await _unitOfWork.Users.GetUserByRefreshTokenAsync(refreshTokenRequest.RefreshToken, cancellationToken);
+        var hashedIncomingToken = HashToken(refreshTokenRequest.RefreshToken);
+        var user = await _unitOfWork.Users.GetUserByRefreshTokenAsync(hashedIncomingToken, cancellationToken);
 
         if (user == null)
         {
-            _logger.LogWarning("Invalid refresh token attempt");
+            // Token not matched as current — check if it was a recently rotated token (reuse attack)
+            var compromisedUser = await _unitOfWork.Users
+                .GetUserByPreviousRefreshTokenHashAsync(hashedIncomingToken, cancellationToken);
+
+            if (compromisedUser != null)
+            {
+                compromisedUser.RefreshToken = null;
+                compromisedUser.PreviousRefreshTokenHash = null;
+                compromisedUser.RefreshTokenExpiresAtUtc = null;
+                await _userManager.UpdateAsync(compromisedUser);
+                _logger.LogWarning(
+                    "Refresh token reuse detected for user {UserId} — all tokens revoked",
+                    compromisedUser.Id);
+            }
+            else
+            {
+                _logger.LogWarning("Invalid refresh token attempt — token not recognised");
+            }
 
             return new RefreshTokenResponse
             {
@@ -221,11 +247,14 @@ var user = await _unitOfWork.Users.GetUserByRefreshTokenAsync(refreshTokenReques
 
         var roles = await _userManager.GetRolesAsync(user);
         var (jwtToken, expirationDateInUtc) = _authTokenProcessor.GenerateJwtToken(user, roles);
+
         var refreshTokenValue = _authTokenProcessor.GenerateRefreshToken();
+        var hashedNewToken = HashToken(refreshTokenValue);
         var refreshExpirationDateInUtc =
             _dateTimeProvider.UtcNow.AddDays(ApplicationConstants.RefreshTokenExpirationDays);
 
-        user.RefreshToken = refreshTokenValue;
+        user.PreviousRefreshTokenHash = user.RefreshToken; // slide the window — old hash enables reuse detection
+        user.RefreshToken = hashedNewToken;
         user.RefreshTokenExpiresAtUtc = refreshExpirationDateInUtc;
         await _userManager.UpdateAsync(user);
 
@@ -237,11 +266,12 @@ var user = await _unitOfWork.Users.GetUserByRefreshTokenAsync(refreshTokenReques
             Message = SuccessMessages.TokenRefreshed,
             AccessToken = jwtToken,
             ExpiresAtUtc = expirationDateInUtc,
-            RefreshToken = refreshTokenValue
+            RefreshToken = refreshTokenValue // plain token to client only
         };
     }
 
-    public async Task<BasicResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
+    public async Task<BasicResponse> ForgotPasswordAsync(ForgotPasswordRequest request,
+        CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByEmailAsync(request.Email);
 
@@ -291,7 +321,8 @@ var user = await _unitOfWork.Users.GetUserByRefreshTokenAsync(refreshTokenReques
         };
     }
 
-    public async Task<BasicResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default)
+    public async Task<BasicResponse> ResetPasswordAsync(ResetPasswordRequest request,
+        CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByEmailAsync(request.Email);
 
@@ -361,7 +392,8 @@ var user = await _unitOfWork.Users.GetUserByRefreshTokenAsync(refreshTokenReques
         };
     }
 
-    public async Task<UserProfileDto?> GetCurrentUserAsync(string userEmail, CancellationToken cancellationToken = default)
+    public async Task<UserProfileDto?> GetCurrentUserAsync(string userEmail,
+        CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByEmailAsync(userEmail);
         if (user == null)
@@ -389,5 +421,15 @@ var user = await _unitOfWork.Users.GetUserByRefreshTokenAsync(refreshTokenReques
             Role.Admin => IdentityRoleConstants.Admin,
             _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Provided role is not supported.")
         };
+    }
+
+    /// <summary>
+    /// Returns the SHA-256 base64 hash of <paramref name="token"/>.
+    /// Used to convert plain refresh tokens into their stored form.
+    /// </summary>
+    private static string HashToken(string token)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        return Convert.ToBase64String(bytes);
     }
 }

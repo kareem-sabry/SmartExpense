@@ -11,6 +11,10 @@ public class User : IdentityUser<Guid>
 
 
     [MaxLength(500)] public string? RefreshToken { get; set; }
+
+    // Holds the hash of the immediately previous refresh token.
+    // A match here signals token reuse (theft) rather than a normal invalid request.
+    [MaxLength(88)] public string? PreviousRefreshTokenHash { get; set; }
     public DateTime? RefreshTokenExpiresAtUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
