@@ -69,7 +69,9 @@ public class AdminService : IAdminService
         };
     }
 
-    public async Task<BasicResponse> MakeUserAdminAsync(Guid userId, string currentAdminEmail, CancellationToken cancellationToken = default)    {
+    public async Task<BasicResponse> MakeUserAdminAsync(Guid userId, Guid currentAdminId,
+        CancellationToken cancellationToken = default)
+    {
         ValidateGuid(userId, nameof(userId));
 
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -80,9 +82,9 @@ public class AdminService : IAdminService
             throw new NotFoundException("User", userId);
         }
 
-        if (user.Email?.Equals(currentAdminEmail, StringComparison.OrdinalIgnoreCase) == true)
+        if (user.Id == currentAdminId)
         {
-            _logger.LogWarning("Admin {Email} attempted to modify own role", currentAdminEmail);
+            _logger.LogWarning("Admin {UserId} attempted to modify own role", currentAdminId);
 
             return new BasicResponse
             {
@@ -117,8 +119,8 @@ public class AdminService : IAdminService
             };
         }
 
-        _logger.LogInformation("Admin role granted to user {Email} by {AdminEmail}",
-            user.Email, currentAdminEmail);
+        _logger.LogInformation("Admin role granted to user {Email} by admin {AdminId}",
+            user.Email, currentAdminId);
 
         return new BasicResponse
         {
@@ -127,7 +129,8 @@ public class AdminService : IAdminService
         };
     }
 
-    public async Task<BasicResponse> RemoveAdminRoleAsync(Guid userId, Guid currentAdminId, CancellationToken cancellationToken = default)
+    public async Task<BasicResponse> RemoveAdminRoleAsync(Guid userId, Guid currentAdminId,
+        CancellationToken cancellationToken = default)
     {
         ValidateGuid(userId, nameof(userId));
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -200,7 +203,8 @@ public class AdminService : IAdminService
         };
     }
 
-    public async Task<BasicResponse> DeleteUserAsync(Guid userId, string currentAdminEmail, CancellationToken cancellationToken = default)
+    public async Task<BasicResponse> DeleteUserAsync(Guid userId, Guid currentAdminId,
+        CancellationToken cancellationToken = default)
     {
         ValidateGuid(userId, nameof(userId));
 
@@ -211,9 +215,9 @@ public class AdminService : IAdminService
             throw new NotFoundException("User", userId);
         }
 
-        if (user.Email?.Equals(currentAdminEmail, StringComparison.OrdinalIgnoreCase) == true)
+        if (user.Id == currentAdminId)
         {
-            _logger.LogWarning("Admin {Email} attempted to delete own account", currentAdminEmail);
+            _logger.LogWarning("Admin {UserId} attempted to delete own account", currentAdminId);
             return new BasicResponse
             {
                 Succeeded = false,

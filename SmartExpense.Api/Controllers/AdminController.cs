@@ -79,10 +79,8 @@ public class AdminController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> MakeUserAdmin(Guid userId, CancellationToken cancellationToken = default)
     {
-        var currentAdminEmail = User.FindFirstValue(ClaimTypes.Email)!;
-
-        var response = await _adminService.MakeUserAdminAsync(userId, currentAdminEmail, cancellationToken);
-
+        var currentAdminId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var response = await _adminService.MakeUserAdminAsync(userId, currentAdminId, cancellationToken);
         if (!response.Succeeded)
             return BadRequest(response);
 
@@ -136,8 +134,8 @@ public class AdminController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> DeleteUser(Guid userId, CancellationToken cancellationToken = default)
     {
-        var currentAdminEmail = User.FindFirstValue(ClaimTypes.Email)!;
-        var response = await _adminService.DeleteUserAsync(userId, currentAdminEmail, cancellationToken);
+        var currentAdminId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var response = await _adminService.DeleteUserAsync(userId, currentAdminId, cancellationToken);
 
         if (!response.Succeeded)
             return BadRequest(response);
