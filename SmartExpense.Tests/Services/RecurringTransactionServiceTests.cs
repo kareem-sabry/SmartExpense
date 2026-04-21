@@ -42,42 +42,145 @@ public class RecurringTransactionServiceTests
     #region GenerateTransactionsAsync Tests
 
     [Fact]
-    public async Task GenerateTransactionsAsync_ShouldNotGenerateDuplicates()
+    public async Task GenerateForRecurringTransactionAsync_ShouldRespectLoopCap_WhenMoreThan100DueDatesExist()
     {
         // Arrange
-        var category = new Category { Id = 1, Name = "Rent" };
+        // Daily frequency starting 2024-10-01 — 137 days before _now (2025-02-15).
+        // Without a cap the loop would produce 137 transactions; the cap must stop it at 100.
+        var category = new Category { Id = 1, Name = "Groceries" };
         var recurring = new RecurringTransaction
         {
             Id = 1,
             UserId = _userId,
             CategoryId = 1,
-            Description = "Monthly Rent",
-            Amount = 1500m,
-            Frequency = RecurrenceFrequency.Monthly,
-            StartDate = new DateTime(2025, 2, 1),
-            LastGeneratedDate = new DateTime(2025, 1, 1),
+            Description = "Daily Groceries",
+            Amount = 50m,
+            Frequency = RecurrenceFrequency.Daily,
+            StartDate = new DateTime(2024, 10, 1),
+            LastGeneratedDate = null, // never generated → all dates are candidates
             IsActive = true,
             Category = category
         };
 
         _recurringRepositoryMock
-            .Setup(x => x.GetAllForUserAsync(_userId, true, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<RecurringTransaction> { recurring });
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(recurring);
 
-        // FK-based dedup: returns true to signal the transaction already exists
+        // No duplicates — every date should attempt to create a transaction until the cap fires.
         _transactionRepositoryMock
-            .Setup(x => x.ExistsForRecurringOnDateAsync(recurring.Id, It.IsAny<DateTime>(),
-                It.IsAny<CancellationToken>()))
+            .Setup(x => x.ExistsForRecurringOnDateAsync(1, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        _transactionRepositoryMock
+            .Setup(x => x.AddAsync(It.IsAny<Transaction>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Transaction t, CancellationToken _) => t);
+
+        // Act
+        var result = await _sut.GenerateForRecurringTransactionAsync(1, _userId);
+
+        // Assert — cap is 100, not 101
+        result.TransactionsGenerated.Should().Be(100);
+        _transactionRepositoryMock.Verify(
+            x => x.AddAsync(It.IsAny<Transaction>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(100));
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateForRecurringTransactionAsync_ShouldRespectEndDate_WhenEndDateBeforeAsOfDate()
+    {
+        // Arrange
+        // Monthly frequency, StartDate = 2025-01-01, EndDate = 2025-01-31.
+        // _now = 2025-02-15. The first (and only) due date within the valid range is 2025-01-31.
+        // February's occurrence (2025-02-28) is after EndDate so must NOT be generated.
+        var category = new Category { Id = 1, Name = "Rent" };
+        var recurring = new RecurringTransaction
+        {
+            Id = 2,
+            UserId = _userId,
+            CategoryId = 1,
+            Description = "Monthly Rent",
+            Amount = 1500m,
+            Frequency = RecurrenceFrequency.Monthly,
+            StartDate = new DateTime(2025, 1, 1),
+            EndDate = new DateTime(2025, 1, 31),
+            LastGeneratedDate = null,
+            IsActive = true,
+            Category = category
+        };
+
+        _recurringRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(2, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(recurring);
+
+        _transactionRepositoryMock
+            .Setup(x => x.ExistsForRecurringOnDateAsync(2, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        _transactionRepositoryMock
+            .Setup(x => x.AddAsync(It.IsAny<Transaction>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Transaction t, CancellationToken _) => t);
+
+        // Act
+        var result = await _sut.GenerateForRecurringTransactionAsync(2, _userId);
+
+        // Assert — exactly one transaction (2025-01-31), none after EndDate
+        result.TransactionsGenerated.Should().Be(1);
+        _transactionRepositoryMock.Verify(
+            x => x.AddAsync(
+                It.Is<Transaction>(t => t.TransactionDate > new DateTime(2025, 1, 31)),
+                It.IsAny<CancellationToken>()),
+            Times.Never,
+            "No transactions should be generated after EndDate");
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateForRecurringTransactionAsync_ShouldUpdateLastGeneratedDate_EvenWhenAllDatesAreDeduped()
+    {
+        // Arrange
+        // All candidate dates already exist in the DB (dedup returns true).
+        // No new transactions are inserted, but LastGeneratedDate must still be updated
+        // so the next run does not re-evaluate the same dates.
+        var category = new Category { Id = 1, Name = "Salary" };
+        var recurring = new RecurringTransaction
+        {
+            Id = 3,
+            UserId = _userId,
+            CategoryId = 1,
+            Description = "Monthly Salary",
+            Amount = 5000m,
+            Frequency = RecurrenceFrequency.Monthly,
+            StartDate = new DateTime(2025, 1, 1),
+            LastGeneratedDate = null,
+            IsActive = true,
+            Category = category
+        };
+
+        _recurringRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(3, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(recurring);
+
+        // All dates are already present — dedup fires for every candidate.
+        _transactionRepositoryMock
+            .Setup(x => x.ExistsForRecurringOnDateAsync(3, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         // Act
-        var result = await _sut.GenerateTransactionsAsync(_userId);
+        var result = await _sut.GenerateForRecurringTransactionAsync(3, _userId);
 
-        // Assert
-        result.TransactionsGenerated.Should().Be(0); // No new transactions generated
+        // Assert — no new transactions, but the template is still updated
+        result.TransactionsGenerated.Should().Be(0);
         _transactionRepositoryMock.Verify(
-            x => x.ExistsForRecurringOnDateAsync(recurring.Id, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
-            Times.AtLeastOnce);
+            x => x.AddAsync(It.IsAny<Transaction>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _recurringRepositoryMock.Verify(
+            x => x.UpdateAsync(
+                It.Is<RecurringTransaction>(r => r.LastGeneratedDate == _now),
+                It.IsAny<CancellationToken>()),
+            Times.Once,
+            "LastGeneratedDate must be updated so future runs do not re-evaluate the same dates");
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -255,11 +358,11 @@ public class RecurringTransactionServiceTests
 
         _recurringRepositoryMock
             .Setup(x => x.AddAsync(It.IsAny<RecurringTransaction>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((RecurringTransaction r,CancellationToken ct) => r);
+            .ReturnsAsync((RecurringTransaction r, CancellationToken ct) => r);
 
         _recurringRepositoryMock
             .Setup(x => x.GetByIdForUserAsync(It.IsAny<int>(), _userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((int id, Guid userId,CancellationToken ct) => new RecurringTransaction
+            .ReturnsAsync((int id, Guid userId, CancellationToken ct) => new RecurringTransaction
             {
                 Id = 1,
                 UserId = userId,
