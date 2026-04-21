@@ -239,7 +239,7 @@ public class RecurringTransactionService : IRecurringTransactionService
             currentDate = GetNextOccurrence(recurring.StartDate, currentDate, recurring.Frequency);
 
             // Safety check to prevent infinite loops
-            if (dueDates.Count > 100)
+            if (dueDates.Count >= 100)
                 break;
         }
 

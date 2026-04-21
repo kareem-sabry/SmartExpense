@@ -159,54 +159,77 @@ public class AnalyticsServiceTests
     #region GetSpendingTrendsAsync Tests
 
     [Fact]
-    public async Task GetSpendingTrendsAsync_ShouldGroupByMonth()
+    public async Task GetSpendingTrendsAsync_GroupByDay_ShouldReturnZeroBuckets_WhenNoTransactions()
     {
-        // Arrange
-        var startDate = new DateTime(2025, 1, 1);
-        var endDate = new DateTime(2025, 2, 28);
-
-        _transactionRepositoryMock
-            .Setup(x => x.GetTrendProjectionsAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<TransactionTrendProjection>
-            {
-                new(new DateTime(2025, 1, 15), TransactionType.Expense, 100m),
-                new(new DateTime(2025, 2, 15), TransactionType.Expense, 200m)
-            });
-
-        // Act
-        var result = await _sut.GetSpendingTrendsAsync(_userId, startDate, endDate);
-
-        // Assert
-        result.Should().HaveCount(2);
-        result[0].Period.Should().Be("Jan 2025");
-        result[0].TotalExpense.Should().Be(100m);
-        result[1].Period.Should().Be("Feb 2025");
-        result[1].TotalExpense.Should().Be(200m);
-    }
-
-    [Fact]
-    public async Task GetSpendingTrendsAsync_ShouldGroupByDay()
-    {
-        // Arrange
+        // Arrange — 3-day window, no transactions at all
         var startDate = new DateTime(2025, 1, 1);
         var endDate = new DateTime(2025, 1, 3);
 
         _transactionRepositoryMock
             .Setup(x => x.GetTrendProjectionsAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<TransactionTrendProjection>
-            {
-                new(new DateTime(2025, 1, 1), TransactionType.Expense, 50m),
-                new(new DateTime(2025, 1, 2), TransactionType.Expense, 75m)
-            });
+            .ReturnsAsync(new List<TransactionTrendProjection>());
 
         // Act
         var result = await _sut.GetSpendingTrendsAsync(_userId, startDate, endDate, "daily");
 
+        // Assert — GroupByDay must still emit one bucket per calendar day,
+        // all zeros. Returning an empty list would break charts on the frontend.
+        result.Should().HaveCount(3, "one bucket per day in the range regardless of transactions");
+        result.Should().AllSatisfy(t =>
+        {
+            t.TotalIncome.Should().Be(0m);
+            t.TotalExpense.Should().Be(0m);
+            t.NetBalance.Should().Be(0m);
+            t.TransactionCount.Should().Be(0);
+        });
+    }
+
+    [Fact]
+    public async Task GetSpendingTrendsAsync_GroupByWeek_ShouldReturnZeroBuckets_WhenNoTransactions()
+    {
+        // Arrange — exactly 2 weeks (14 days), no transactions
+        var startDate = new DateTime(2025, 1, 1);
+        var endDate = new DateTime(2025, 1, 14);
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetTrendProjectionsAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TransactionTrendProjection>());
+
+        // Act
+        var result = await _sut.GetSpendingTrendsAsync(_userId, startDate, endDate, "weekly");
+
         // Assert
-        result.Should().HaveCount(3); // 3 days
-        result[0].TotalExpense.Should().Be(50m);
-        result[1].TotalExpense.Should().Be(75m);
-        result[2].TotalExpense.Should().Be(0m); // No transactions on day 3
+        result.Should().HaveCount(2, "one bucket per week in the range");
+        result.Should().AllSatisfy(t =>
+        {
+            t.TotalExpense.Should().Be(0m);
+            t.TotalIncome.Should().Be(0m);
+            t.TransactionCount.Should().Be(0);
+        });
+    }
+
+    [Fact]
+    public async Task GetSpendingTrendsAsync_GroupByMonth_ShouldReturnZeroBuckets_WhenNoTransactions()
+    {
+        // Arrange — Jan + Feb 2025, no transactions
+        var startDate = new DateTime(2025, 1, 1);
+        var endDate = new DateTime(2025, 2, 28);
+
+        _transactionRepositoryMock
+            .Setup(x => x.GetTrendProjectionsAsync(_userId, startDate, endDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TransactionTrendProjection>());
+
+        // Act
+        var result = await _sut.GetSpendingTrendsAsync(_userId, startDate, endDate, "monthly");
+
+        // Assert
+        result.Should().HaveCount(2, "one bucket for January and one for February");
+        result.Should().AllSatisfy(t =>
+        {
+            t.TotalExpense.Should().Be(0m);
+            t.TotalIncome.Should().Be(0m);
+            t.NetBalance.Should().Be(0m);
+        });
     }
 
     #endregion
