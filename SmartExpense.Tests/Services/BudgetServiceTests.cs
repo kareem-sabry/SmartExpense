@@ -5,7 +5,6 @@ using SmartExpense.Application.Interfaces;
 using SmartExpense.Core.Entities;
 using SmartExpense.Core.Enums;
 using SmartExpense.Core.Exceptions;
-using SmartExpense.Core.Models;
 using SmartExpense.Infrastructure.Services;
 
 namespace SmartExpense.Tests.Services;

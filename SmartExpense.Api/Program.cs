@@ -19,7 +19,6 @@ using SmartExpense.Core.Entities;
 using SmartExpense.Core.Models;
 using SmartExpense.Infrastructure.Data;
 using SmartExpense.Infrastructure.Interceptors;
-using SmartExpense.Infrastructure.Repositories;
 using SmartExpense.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);

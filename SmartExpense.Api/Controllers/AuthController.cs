@@ -1,14 +1,15 @@
 ﻿using System.Security.Claims;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using SmartExpense.Application.Dtos.Auth;
 using SmartExpense.Application.Interfaces;
 using SmartExpense.Core.Constants;
+using ForgotPasswordRequest = SmartExpense.Application.Dtos.Auth.ForgotPasswordRequest;
 using LoginRequest = SmartExpense.Application.Dtos.Auth.LoginRequest;
 using RegisterRequest = SmartExpense.Application.Dtos.Auth.RegisterRequest;
+using ResetPasswordRequest = SmartExpense.Application.Dtos.Auth.ResetPasswordRequest;
 
 namespace SmartExpense.Api.Controllers;
 
