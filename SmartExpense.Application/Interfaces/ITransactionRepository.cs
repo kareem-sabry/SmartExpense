@@ -1,6 +1,6 @@
 ﻿using SmartExpense.Core.Entities;
-using SmartExpense.Core.Models;
 using SmartExpense.Core.Enums;
+using SmartExpense.Core.Models;
 
 
 namespace SmartExpense.Application.Interfaces;

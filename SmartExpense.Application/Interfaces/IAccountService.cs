@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Identity.Data;
-using SmartExpense.Application.Dtos.Auth;
+﻿using SmartExpense.Application.Dtos.Auth;
+using ForgotPasswordRequest = SmartExpense.Application.Dtos.Auth.ForgotPasswordRequest;
 using LoginRequest = SmartExpense.Application.Dtos.Auth.LoginRequest;
 using RegisterRequest = SmartExpense.Application.Dtos.Auth.RegisterRequest;
+using ResetPasswordRequest = SmartExpense.Application.Dtos.Auth.ResetPasswordRequest;
 
 namespace SmartExpense.Application.Interfaces;
 
