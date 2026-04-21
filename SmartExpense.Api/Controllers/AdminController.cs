@@ -80,7 +80,12 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> MakeUserAdmin(Guid userId, CancellationToken cancellationToken = default)
     {
         var currentAdminEmail = User.FindFirstValue(ClaimTypes.Email)!;
+
         var response = await _adminService.MakeUserAdminAsync(userId, currentAdminEmail, cancellationToken);
+
+        if (!response.Succeeded)
+            return BadRequest(response);
+
         return Ok(response);
     }
 
@@ -105,6 +110,9 @@ public class AdminController : ControllerBase
     {
         var currentAdminId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var response = await _adminService.RemoveAdminRoleAsync(userId, currentAdminId, cancellationToken);
+        if (!response.Succeeded)
+            return BadRequest(response);
+
         return Ok(response);
     }
 
@@ -130,6 +138,10 @@ public class AdminController : ControllerBase
     {
         var currentAdminEmail = User.FindFirstValue(ClaimTypes.Email)!;
         var response = await _adminService.DeleteUserAsync(userId, currentAdminEmail, cancellationToken);
+
+        if (!response.Succeeded)
+            return BadRequest(response);
+
         return Ok(response);
     }
 }

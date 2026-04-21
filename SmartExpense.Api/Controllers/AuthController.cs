@@ -82,7 +82,7 @@ public class AuthController : ControllerBase
         var response = await _accountService.LoginAsync(loginRequest);
         if (response.Succeeded) return Ok(response);
 
-        return BadRequest(response);
+        return Unauthorized(response);
     }
 
     /// <summary>
