@@ -10,7 +10,7 @@ public class User : IdentityUser<Guid>
     [Required] [MaxLength(100)] public required string LastName { get; set; }
 
 
-    [MaxLength(500)] public string? RefreshToken { get; set; }
+    [MaxLength(88)] public string? RefreshToken { get; set; }
 
     // Holds the hash of the immediately previous refresh token.
     // A match here signals token reuse (theft) rather than a normal invalid request.
