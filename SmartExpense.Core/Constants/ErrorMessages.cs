@@ -19,13 +19,17 @@ public static class ErrorMessages
     public const string UserNotAdmin = "User is not an admin.";
     public const string CannotRegisterAsAdmin = "You can only register as a normal user.";
 
+    public const string AccountLocked =
+        "Your account has been temporarily locked due to too many failed login attempts. Please try again later.";
+
     // Token errors
     public const string RefreshTokenMissing = "Refresh token is missing.";
     public const string RefreshTokenExpired = "Refresh token has expired. Please log in again.";
     public const string RefreshTokenInvalid = "Invalid refresh token.";
 
     public const string
-        RefreshTokenReuseDetected = "Invalid refresh token."; // deliberately identical — reveals nothing to the caller but appears in structured logging
+        RefreshTokenReuseDetected =
+            "Invalid refresh token."; // deliberately identical — reveals nothing to the caller but appears in structured logging
 
     // General errors
     public const string InvalidId = "Invalid ID provided.";

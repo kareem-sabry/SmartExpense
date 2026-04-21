@@ -116,17 +116,32 @@ public class AccountService : IAccountService
         CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByEmailAsync(loginRequest.Email);
-        if (user == null || !await _userManager.CheckPasswordAsync(user, loginRequest.Password))
+
+        if (user == null)
         {
             _logger.LogWarning("Failed login attempt for email: {Email}", loginRequest.Email);
 
-            return new LoginResponse
-            {
-                Succeeded = false,
-                Message = ErrorMessages.InvalidCredentials
-            };
+            return new LoginResponse { Succeeded = false, Message = ErrorMessages.InvalidCredentials };
         }
 
+        // Check lockout BEFORE attempting the password so that brute-force is stopped even if the attacker knows the correct password.
+
+        if (await _userManager.IsLockedOutAsync(user))
+        {
+            _logger.LogWarning("Locked-out login attempt for {Email}", loginRequest.Email);
+            return new LoginResponse { Succeeded = false, Message = ErrorMessages.AccountLocked };
+        }
+
+        if (!await _userManager.CheckPasswordAsync(user, loginRequest.Password))
+        {
+            // Increment the failure counter — Identity will trigger lockout automatically once MaxFailedAccessAttempts (configured as 5) is reached.
+            await _userManager.AccessFailedAsync(user);
+            _logger.LogWarning("Failed login attempt for email: {Email}", loginRequest.Email);
+            return new LoginResponse { Succeeded = false, Message = ErrorMessages.InvalidCredentials };
+        }
+        // Successful login — reset the counter so a future run of 5 failures starts fresh.
+
+        await _userManager.ResetAccessFailedCountAsync(user);
 
         var roles = await _userManager.GetRolesAsync(user);
         var (jwtToken, expirationDateInUtc) = _authTokenProcessor.GenerateJwtToken(user, roles);
