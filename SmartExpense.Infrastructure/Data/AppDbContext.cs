@@ -24,7 +24,7 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
         {
             entity.Property(u => u.FirstName).HasMaxLength(100).IsRequired();
             entity.Property(u => u.LastName).HasMaxLength(100).IsRequired();
-            entity.Property(u => u.RefreshToken).HasMaxLength(500);
+            entity.Property(u => u.RefreshToken).HasMaxLength(88);
         });
 
         // Category Configuration
