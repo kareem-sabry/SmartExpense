@@ -188,8 +188,9 @@ public class BudgetServiceTests
             .ReturnsAsync(budgets);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
+            .Setup(x => x.GetActualSpentAsync(_userId, 1,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0m);
 
         // Act
         var result = await _sut.GetAllAsync(_userId, 2, 2025);
@@ -225,8 +226,9 @@ public class BudgetServiceTests
             .ReturnsAsync(budget);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
+            .Setup(x => x.GetActualSpentAsync(_userId, 1,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0m);
 
         // Act
         var result = await _sut.GetByIdAsync(1, _userId);
@@ -305,8 +307,9 @@ public class BudgetServiceTests
             });
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
+            .Setup(x => x.GetActualSpentAsync(_userId, dto.CategoryId,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0m);
 
         // Act
         var result = await _sut.CreateAsync(dto, _userId);
@@ -461,8 +464,9 @@ public class BudgetServiceTests
             .ReturnsAsync(existingBudget);
 
         _transactionRepositoryMock
-            .Setup(x => x.GetPagedAsync(_userId, It.IsAny<TransactionQueryParameters>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResult<Transaction> { Data = new List<Transaction>() });
+            .Setup(x => x.GetActualSpentAsync(_userId, existingBudget.CategoryId,
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0m);
 
         // Act
         var result = await _sut.UpdateAsync(1, dto, _userId);
