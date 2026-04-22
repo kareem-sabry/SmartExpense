@@ -18,11 +18,7 @@ try
 
     builder.Host.UseSerilog((ctx, services, cfg) =>
         cfg.ReadFrom.Configuration(ctx.Configuration)
-            .ReadFrom.Services(services)
-            .Enrich.FromLogContext()
-            .Enrich.WithCorrelationId()
-            .Enrich.WithMachineName()
-            .Enrich.WithThreadId());
+            .ReadFrom.Services(services));
 
     builder.Services.AddHttpContextAccessor();
 
