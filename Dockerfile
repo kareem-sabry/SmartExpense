@@ -10,25 +10,20 @@ COPY ["SmartExpense.Infrastructure/SmartExpense.Infrastructure.csproj",   "Smart
 
 RUN dotnet restore "SmartExpense.Api/SmartExpense.Api.csproj"
 
-# Copy the rest of the source and build
-COPY . .
-WORKDIR "/src/SmartExpense.Api"
-RUN dotnet build "SmartExpense.Api.csproj" -c Release -o /app/build --no-restore
+# Copy the rest of the source and publish in one step.
 
-# ── Publish stage ─────────────────────────────────────────────────────────────
-FROM build AS publish
-RUN dotnet publish "SmartExpense.Api.csproj" -c Release -o /app/publish \
-    --no-restore /p:UseAppHost=false
+COPY . .
+RUN dotnet publish "SmartExpense.Api/SmartExpense.Api.csproj" \
+    -c Release -o /app/publish /p:UseAppHost=false
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 
-# Non-root user for security
 RUN adduser --disabled-password --gecos "" appuser && chown -R appuser /app
 USER appuser
 
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
