@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Diagnostics;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using SmartExpense.Core.Exceptions;
 
@@ -22,21 +23,27 @@ public class GlobalExceptionHandler : IExceptionHandler
     {
         var (statusCode, title) = GetStatusAndTitle(exception);
 
-        // Expected domain exceptions (4xx) are informational — log as Warning.
-        // Unexpected failures (5xx) are actual errors that need investigation.
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
+        var correlationId = httpContext.TraceIdentifier;
+
         if (statusCode >= 500)
             _logger.LogError(exception,
-                "Unhandled server error on {Method} {Path}: {Message}",
-                httpContext.Request.Method,
-                httpContext.Request.Path,
-                exception.Message);
-        else
-            _logger.LogWarning(
-                "{ExceptionType} on {Method} {Path}: {Message}",
+                "Unhandled {ExceptionType} on {Method} {Path} — CorrelationId: {CorrelationId}, User: {UserId}",
                 exception.GetType().Name,
                 httpContext.Request.Method,
                 httpContext.Request.Path,
-                exception.Message);
+                correlationId,
+                userId);
+
+        else
+            _logger.LogWarning(
+                "{ExceptionType} on {Method} {Path} — {ExceptionMessage} — CorrelationId: {CorrelationId}, User: {UserId}",
+                exception.GetType().Name,
+                httpContext.Request.Method,
+                httpContext.Request.Path,
+                exception.Message,
+                correlationId,
+                userId);
 
         var problemDetails = CreateProblemDetails(httpContext, exception, statusCode, title);
 

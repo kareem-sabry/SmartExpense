@@ -22,7 +22,6 @@
 !.vscode/launch.json
 !.vscode/extensions.json
 # User secrets
-appsettings.Development.json
 secrets.json
 
 # Test results
