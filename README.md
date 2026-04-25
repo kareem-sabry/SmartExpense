@@ -1,10 +1,11 @@
 # SmartExpense API
 
-A production-grade personal finance REST API built with .NET 9 and Clean Architecture. Tracks income and expenses, enforces per-category monthly budgets, generates recurring transactions automatically, and surfaces analytics for spending trends, category breakdowns, and month-over-month comparisons.
+A personal finance REST API built with .NET 9 and Clean Architecture. Tracks income and expenses, enforces per-category monthly budgets, handles recurring transactions, and exposes six analytics endpoints for spending trends, category breakdowns, and budget performance.
 
 [![CI](https://github.com/kareem-sabry/SmartExpense/actions/workflows/ci.yml/badge.svg)](https://github.com/kareem-sabry/SmartExpense/actions/workflows/ci.yml)
 [![CD](https://github.com/kareem-sabry/SmartExpense/actions/workflows/cd.yml/badge.svg)](https://github.com/kareem-sabry/SmartExpense/actions/workflows/cd.yml)
 ![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![License](https://img.shields.io/github/license/kareem-sabry/SmartExpense)
 
 ---
@@ -28,48 +29,50 @@ A production-grade personal finance REST API built with .NET 9 and Clean Archite
 
 ## Features
 
-**Core domain**
-- Full transaction lifecycle — create, read, update, delete, paginate, filter by date range / type / category, and export to CSV
+**Domain**
+- Full transaction lifecycle — create, read, update, delete, paginate, filter by date range / type / category, export to CSV
 - Per-category monthly budgets with conflict detection (one budget per category per month)
 - Recurring transactions (daily / weekly / monthly / yearly) with automatic scheduling and FK-based deduplication
-- Six analytics endpoints: financial overview, spending trends, category breakdown, monthly comparison, budget performance, and top categories
+- Six analytics endpoints: financial overview, spending trends, category breakdown, monthly comparison, budget performance, top categories
+
+**Auth and access**
+- JWT authentication with refresh token rotation and reuse detection
+- Account lockout after 5 failed login attempts (15-minute window)
+- Password reset via single-use tokens (2-hour expiry) delivered by email
+- Role-based access control — `User` and `Admin` roles with separate policy gates
 
 **Infrastructure**
-- JWT authentication with refresh token rotation and reuse detection
-- Account lockout after 5 failed attempts (15-minute window)
-- Password reset flow via time-limited tokens (2-hour expiry) sent by email
-- Role-based access control — `User` and `Admin` roles with separate policy gates
 - IP-partitioned rate limiting — global (100 req/min), auth (5 req/min), export (50 req/min)
-- Seven HTTP security headers on every response (CSP, X-Frame-Options, X-XSS-Protection, HSTS, Referrer-Policy, X-Content-Type-Options)
-- EF Core save interceptor that auto-stamps `CreatedAtUtc`, `UpdatedAtUtc`, `CreatedBy`, and `UpdatedBy` on every entity write
+- Seven HTTP security headers on every response
+- EF Core `SaveChanges` interceptor that auto-stamps `CreatedAtUtc`, `UpdatedAtUtc`, `CreatedBy`, `UpdatedBy` on every write
 - Structured logging with Serilog, correlation ID propagation, and Seq sink
+- RFC 7807 `ProblemDetails` error responses; stack traces only in Development
 
 ---
 
 ## Architecture
 
-The solution enforces a strict **4-layer Clean Architecture** with inward-only dependency flow:
+Four-layer Clean Architecture with inward-only dependency flow:
 
 ```
-SmartExpense.Api              → Presentation (controllers, middleware, filters)
+SmartExpense.Api              → Controllers, middleware, filters, DI wiring
     ↓
-SmartExpense.Application      → Use-case contracts (interfaces, DTOs)
+SmartExpense.Application      → Service interfaces, DTOs, validator contracts
     ↓
-SmartExpense.Core             → Domain (entities, enums, exceptions, interfaces)
+SmartExpense.Core             → Entities, enums, domain exceptions, interfaces
 
-SmartExpense.Infrastructure   → Implementation (EF Core, Identity, services, repositories)
-    ↓ references Application + Core
+SmartExpense.Infrastructure   → EF Core, Identity, service and repository implementations
+    references Application + Core
 ```
 
-The `Infrastructure` layer implements the interfaces declared in `Application`. The `Api` layer orchestrates the pipeline but contains no business logic. Controllers delegate entirely to injected services; all domain decisions happen in the service layer.
+Controllers delegate entirely to injected services. Business logic lives in the service layer. The `Infrastructure` layer implements the interfaces declared in `Application` — the `Api` layer never references `Infrastructure` types directly.
 
-**Design patterns applied**
+**Patterns used**
 
-- **Repository + Unit of Work** — data access is abstracted behind `IGenericRepository<T>` and `IUnitOfWork`; services never reference `DbContext` directly
-- **Factory** — `User.Create(...)` enforces invariants at construction time
-- **Options pattern** — `JwtOptions`, `AdminUserOptions`, and `EmailOptions` are bound from configuration and validated at startup
-- **Decorator** — analytics caching wraps the real `AnalyticsService` transparently without modifying it
-- **EF Core Interceptor** — `AuditInterceptor` stamps audit fields before every `SaveChanges`, requiring zero changes in service code
+- **Repository + Unit of Work** — `IGenericRepository<T>` and `IUnitOfWork` abstract all data access; services never touch `DbContext`
+- **Options pattern** — `JwtOptions`, `AdminUserOptions`, `EmailOptions` bound from configuration and validated at startup
+- **EF Core Interceptor** — `AuditInterceptor` stamps audit fields before every `SaveChanges`, with no changes required in service code
+- **Global action filter** — `ValidationFilter` runs FluentValidation on every request argument before the action body executes
 
 ---
 
@@ -79,15 +82,16 @@ The `Infrastructure` layer implements the interfaces declared in `Application`. 
 |---|---|
 | Runtime | .NET 9 / ASP.NET Core 9 |
 | ORM | Entity Framework Core 9 |
-| Database | SQL Server 2022 |
+| Database | PostgreSQL 16 |
 | Identity | ASP.NET Core Identity |
 | Authentication | JWT Bearer + Refresh Tokens |
+| Validation | FluentValidation |
 | Logging | Serilog + Seq |
 | API versioning | Asp.Versioning |
 | Documentation | Swagger / Swashbuckle |
 | Testing | xUnit, Moq, FluentAssertions |
 | Containerisation | Docker, Docker Compose |
-| CI/CD | GitHub Actions + GHCR |
+| CI/CD | GitHub Actions → GHCR → Railway |
 
 ---
 
@@ -95,38 +99,42 @@ The `Infrastructure` layer implements the interfaces declared in `Application`. 
 
 ```
 SmartExpense/
-├── SmartExpense.Api/
-│   ├── Controllers/          # Auth, Transaction, Category, Budget, Analytics, RecurringTransaction, Admin
-│   ├── Extensions/           # IServiceCollection and IApplicationBuilder extension methods
-│   ├── Middlewares/          # GlobalExceptionHandler, CorrelationIdMiddleware
-│   └── Program.cs
+├── src/
+│   ├── SmartExpense.Api/
+│   │   ├── Controllers/        # Auth, Transaction, Category, Budget, Analytics, RecurringTransaction, Admin
+│   │   ├── Extensions/         # IServiceCollection and IApplicationBuilder extension methods
+│   │   ├── Filters/            # ValidationFilter
+│   │   ├── Middlewares/        # GlobalExceptionHandler, CorrelationIdMiddleware
+│   │   └── Program.cs
+│   │
+│   ├── SmartExpense.Application/
+│   │   ├── Dtos/               # Request and response DTOs per domain area
+│   │   ├── Interfaces/         # Service and repository contracts
+│   │   └── Validators/         # FluentValidation validators per DTO
+│   │
+│   ├── SmartExpense.Core/
+│   │   ├── Constants/          # ApplicationConstants, ErrorMessages, SuccessMessages
+│   │   ├── Entities/           # User, Transaction, Category, Budget, RecurringTransaction
+│   │   ├── Enums/              # TransactionType, RecurrenceFrequency, Role, BudgetStatus
+│   │   └── Exceptions/         # NotFoundException, ConflictException, ValidationException, ForbiddenException
+│   │
+│   └── SmartExpense.Infrastructure/
+│       ├── Data/               # AppDbContext, DbInitializer, UnitOfWork
+│       ├── Interceptors/       # AuditInterceptor
+│       ├── Migrations/         # EF Core migration history
+│       ├── Repositories/       # Generic and domain-specific repository implementations
+│       └── Services/           # AccountService, TransactionService, AnalyticsService, ...
 │
-├── SmartExpense.Application/
-│   ├── Dtos/                 # Request and response DTOs per domain (Auth, Transaction, Budget, ...)
-│   └── Interfaces/           # Service and repository contracts
+├── tests/
+│   └── SmartExpense.Tests/
+│       ├── Controllers/        # Controller unit tests
+│       ├── Repositories/       # Repository unit tests with in-memory EF Core
+│       └── Services/           # Service unit tests (130+ tests)
 │
-├── SmartExpense.Core/
-│   ├── Constants/            # ApplicationConstants, ErrorMessages, SuccessMessages, IdentityRoleConstants
-│   ├── Entities/             # User, Transaction, Category, Budget, RecurringTransaction
-│   ├── Enums/                # TransactionType, RecurrenceFrequency, Role, BudgetStatus
-│   ├── Exceptions/           # NotFoundException, ConflictException, ValidationException, ForbiddenException
-│   └── Interfaces/           # IAuditable, IEntity, IUserOwnedEntity
-│
-├── SmartExpense.Infrastructure/
-│   ├── Data/                 # AppDbContext, DbInitializer, entity configurations
-│   ├── Interceptors/         # AuditInterceptor
-│   ├── Migrations/           # EF Core migration history
-│   ├── Repositories/         # Generic + domain-specific repository implementations
-│   └── Services/             # AccountService, TransactionService, AnalyticsService, ...
-│
-├── SmartExpense.Tests/
-│   ├── Controllers/          # Controller unit tests
-│   ├── Repositories/         # Repository unit tests
-│   └── Services/             # Service unit tests (130+ tests, 90%+ coverage)
-│
-├── .github/workflows/        # ci.yml, cd.yml
-├── docker-compose.yml        # API + SQL Server + Seq
+├── .github/workflows/          # ci.yml, cd.yml
+├── docker-compose.yml          # API + PostgreSQL + Seq
 ├── Dockerfile
+├── global.json
 └── .env.example
 ```
 
@@ -147,7 +155,7 @@ cd SmartExpense
 cp .env.example .env
 ```
 
-Open `.env` and fill in every value. See [Environment Variables](#environment-variables) for details.
+Fill in every value in `.env`. See [Environment Variables](#environment-variables).
 
 ### 2. Start the stack
 
@@ -155,70 +163,71 @@ Open `.env` and fill in every value. See [Environment Variables](#environment-va
 docker compose up -d
 ```
 
-This starts three containers:
+Three containers start:
 
 | Container | Purpose | Port |
 |---|---|---|
 | `smartexpense-api` | ASP.NET Core API | `5000` |
-| `smartexpense-db` | SQL Server 2022 | `1433` |
-| `smartexpense-seq` | Structured log UI | `8081` (UI) / `5341` (ingest) |
+| `smartexpense-db` | PostgreSQL 16 | `5432` |
+| `smartexpense-seq` | Structured log UI | `8081` |
 
-The API waits for SQL Server's health check before starting, then applies migrations and seeds the default admin user automatically.
+The API waits for the database health check before starting, then applies migrations and seeds the admin user automatically.
 
 ### 3. Open Swagger
 
-Navigate to [http://localhost:5000](http://localhost:5000) for the interactive API documentation.
+[http://localhost:5000](http://localhost:5000)
 
-### 4. Open Seq (structured logs)
+### 4. View structured logs (Seq)
 
-Navigate to [http://localhost:8081](http://localhost:8081) to view real-time structured log events, filterable by `CorrelationId`, `UserId`, `StatusCode`, `RequestPath`, and any other structured property.
+[http://localhost:8081](http://localhost:8081) — filterable by `CorrelationId`, `UserId`, `StatusCode`, `RequestPath`, and any other structured property.
 
-### Running locally (without Docker)
+### Running locally without Docker
 
 ```bash
-# Requires SQL Server accessible at the connection string in user secrets / appsettings
 dotnet restore
 dotnet build SmartExpense.sln
-cd SmartExpense.Api
+cd src/SmartExpense.Api
 dotnet run
 ```
+
+Requires a PostgreSQL instance at the connection string configured in `appsettings.Development.json` or user secrets.
 
 ---
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and populate every field before running.
+Copy `.env.example` to `.env` before running. The `.env` file is gitignored.
 
 | Variable | Description | Example |
 |---|---|---|
-| `DB_PASSWORD` | SQL Server SA password | `YourStrong@Passw0rd` |
-| `JWT_SECRET` | HS256 signing key — minimum 32 characters | *(generate with `openssl rand -base64 48`)* |
+| `DB_PASSWORD` | PostgreSQL password | `YourStrong@Passw0rd` |
+| `JWT_SECRET` | HS256 signing key, minimum 32 characters | *(generate: `openssl rand -base64 48`)* |
 | `ADMIN_EMAIL` | Email for the seeded admin account | `admin@smartexpense.com` |
 | `ADMIN_PASSWORD` | Password for the seeded admin account | `Admin@12345` |
 | `SMTP_HOST` | SMTP server hostname | `smtp.mailgun.org` |
 | `SMTP_PORT` | SMTP port | `587` |
 | `SMTP_USERNAME` | SMTP authentication username | |
-| `SMTP_PASSWORD` | SMTP authentication password / API key | |
+| `SMTP_PASSWORD` | SMTP password or API key | |
 | `FROM_EMAIL` | Sender address for system emails | `noreply@smartexpense.com` |
-
-> **Note:** `.env` is listed in `.gitignore` and will never be committed.
+| `SEQ_USER` | Seq admin username | `admin` |
+| `SEQ_PASS` | Seq admin password | |
 
 ---
 
 ## API Reference
 
-All endpoints are versioned under `/api/v1/`. The full interactive specification is available at [http://localhost:5000](http://localhost:5000) when the API is running.
+All endpoints are under `/api/v1/`. The full interactive spec is at [http://localhost:5000](http://localhost:5000) when running locally, or at the Railway URL in production.
 
 ### Auth — `/api/v1/auth`
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/register` | Public | Register a new user account |
+| `POST` | `/register` | Public | Create a new account |
 | `POST` | `/login` | Public | Authenticate and receive JWT + refresh token |
-| `POST` | `/refresh-token` | Public | Exchange refresh token for a new JWT pair |
+| `POST` | `/refresh-token` | Public | Exchange a refresh token for a new JWT pair |
 | `POST` | `/logout` | JWT | Invalidate the current refresh token |
 | `GET` | `/me` | JWT | Get the authenticated user's profile |
-| `POST` | `/forgot-password` | Public | Trigger password reset email |
+| `POST` | `/forgot-password` | Public | Send a password reset email |
 | `POST` | `/reset-password` | Public | Complete password reset with token |
 | `DELETE` | `/delete-account` | JWT | Permanently delete the authenticated account |
 
@@ -226,8 +235,8 @@ All endpoints are versioned under `/api/v1/`. The full interactive specification
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/` | Paginated list with date / type / category filters |
-| `GET` | `/{id}` | Single transaction by ID |
+| `GET` | `/` | Paginated list, filterable by date range / type / category |
+| `GET` | `/{id}` | Single transaction |
 | `GET` | `/recent?count=10` | Most recent N transactions |
 | `GET` | `/summary` | Aggregated income, expense, net balance |
 | `GET` | `/export?startDate=&endDate=` | CSV export for a date range |
@@ -240,7 +249,7 @@ All endpoints are versioned under `/api/v1/`. The full interactive specification
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/` | All categories for the authenticated user |
-| `GET` | `/{id}` | Single category by ID |
+| `GET` | `/{id}` | Single category |
 | `POST` | `/` | Create a category |
 | `PUT` | `/{id}` | Update a category |
 | `DELETE` | `/{id}` | Delete a category |
@@ -250,8 +259,8 @@ All endpoints are versioned under `/api/v1/`. The full interactive specification
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/?month=&year=` | All budgets, optionally filtered by month/year |
-| `GET` | `/{id}` | Single budget by ID |
-| `GET` | `/summary?month=&year=` | Aggregated totals for a month |
+| `GET` | `/{id}` | Single budget |
+| `GET` | `/summary?month=&year=` | Aggregated totals for a given month |
 | `POST` | `/` | Create a budget (one per category per month) |
 | `PUT` | `/{id}` | Update a budget |
 | `DELETE` | `/{id}` | Delete a budget |
@@ -260,12 +269,12 @@ All endpoints are versioned under `/api/v1/`. The full interactive specification
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/?isActive=` | All recurring templates, optionally filtered by active state |
-| `GET` | `/{id}` | Single template by ID |
+| `GET` | `/?isActive=` | All templates, optionally filtered by active state |
+| `GET` | `/{id}` | Single template |
 | `POST` | `/` | Create a recurring template |
-| `PUT` | `/{id}` | Update a recurring template |
-| `DELETE` | `/{id}` | Delete a recurring template |
-| `POST` | `/{id}/toggle` | Pause or resume a recurring template |
+| `PUT` | `/{id}` | Update a template |
+| `DELETE` | `/{id}` | Delete a template |
+| `POST` | `/{id}/toggle` | Pause or resume a template |
 | `POST` | `/generate` | Generate due transactions for all active templates |
 | `POST` | `/{id}/generate` | Generate due transactions for one template |
 
@@ -273,9 +282,9 @@ All endpoints are versioned under `/api/v1/`. The full interactive specification
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/overview?startDate=&endDate=` | Full financial overview for a period |
+| `GET` | `/overview?startDate=&endDate=` | Financial overview for a period |
 | `GET` | `/spending-trends?startDate=&endDate=&groupBy=monthly` | Income and expense trends (daily / weekly / monthly) |
-| `GET` | `/category-breakdown?startDate=&endDate=&expenseOnly=true` | Spending breakdown by category with percentages |
+| `GET` | `/category-breakdown?startDate=&endDate=&expenseOnly=true` | Spending by category with percentages |
 | `GET` | `/monthly-comparison?numberOfMonths=6` | Month-over-month income and expense comparison |
 | `GET` | `/budget-performance?month=&year=` | Actual spend vs budget per category |
 | `GET` | `/top-categories?startDate=&endDate=&count=5` | Top spending or income categories |
@@ -285,16 +294,16 @@ All endpoints are versioned under `/api/v1/`. The full interactive specification
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/users` | List all users with roles |
-| `GET` | `/users/{userId}` | Get a single user by ID |
-| `POST` | `/users/{userId}/make-admin` | Grant the Admin role |
-| `POST` | `/users/{userId}/remove-admin` | Revoke the Admin role |
+| `GET` | `/users/{userId}` | Get a user by ID |
+| `POST` | `/users/{userId}/make-admin` | Grant Admin role |
+| `POST` | `/users/{userId}/remove-admin` | Revoke Admin role |
 | `DELETE` | `/users/{userId}` | Delete a user account |
 
 ### Health
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/health` | JSON health report — checks database connectivity |
+| `GET` | `/health` | JSON health report including database connectivity |
 
 ---
 
@@ -302,23 +311,23 @@ All endpoints are versioned under `/api/v1/`. The full interactive specification
 
 ```
 POST /api/v1/auth/register
-  → account created, roles assigned
+  → account created, role assigned
 
 POST /api/v1/auth/login
-  → returns { accessToken, refreshToken, expiresAt }
+  → { accessToken, refreshToken, expiresAt }
 
-  Include on every protected request:
+  Every protected request:
   Authorization: Bearer <accessToken>
 
-POST /api/v1/auth/refresh-token  (when accessToken expires)
+POST /api/v1/auth/refresh-token  (when access token expires)
   body: { accessToken, refreshToken }
-  → returns new { accessToken, refreshToken }
+  → new { accessToken, refreshToken }
 
 POST /api/v1/auth/logout
   → refresh token invalidated server-side
 ```
 
-Refresh tokens are stored as SHA-256 hashes in the database. The previous token hash is retained to detect and reject reuse, which signals token theft.
+Refresh tokens are stored as SHA-256 hashes. The previous token hash is retained to detect reuse — if a refresh token is used twice, both are invalidated immediately.
 
 ---
 
@@ -326,22 +335,22 @@ Refresh tokens are stored as SHA-256 hashes in the database. The previous token 
 
 | Control | Implementation |
 |---|---|
-| Authentication | JWT HS256 with 15-minute access token lifetime |
-| Token rotation | Refresh token replaced on every use; previous hash retained for reuse detection |
-| Account lockout | 5 failed login attempts trigger a 15-minute lockout |
-| Rate limiting | Global 100 req/min; auth endpoints 5 req/min; export 50 req/min — partitioned by user identity or IP |
-| Password requirements | Minimum 8 chars, uppercase, lowercase, digit, special character |
-| Password reset | Single-use token with 2-hour expiry; `forgot-password` always returns 200 to prevent email enumeration |
-| HTTP headers | `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`, `Content-Security-Policy` on every response |
-| Error responses | Domain exceptions return RFC 7807 `ProblemDetails`; stack traces only included in Development |
-| Data ownership | All repository queries are scoped to the authenticated user's ID — cross-user data access returns 404 |
-| Audit trail | `CreatedAtUtc`, `UpdatedAtUtc`, `CreatedBy`, `UpdatedBy` auto-stamped on every entity write via EF Core interceptor |
+| Authentication | JWT HS256, 15-minute access token lifetime |
+| Token rotation | Refresh token replaced on every use; reuse invalidates both tokens |
+| Account lockout | 5 failed attempts trigger a 15-minute lockout |
+| Rate limiting | Global 100 req/min; auth 5 req/min; export 50 req/min — partitioned by identity or IP |
+| Password policy | Minimum 8 chars, requires uppercase, lowercase, digit, special character |
+| Password reset | Single-use token, 2-hour expiry; `forgot-password` always returns 200 to avoid email enumeration |
+| HTTP headers | `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`, `Content-Security-Policy` |
+| Error responses | RFC 7807 `ProblemDetails`; stack traces only in Development |
+| Data isolation | All repository queries are scoped to the authenticated user's ID |
+| Audit trail | `CreatedAtUtc`, `UpdatedAtUtc`, `CreatedBy`, `UpdatedBy` auto-stamped via EF Core interceptor |
 
 ---
 
 ## Observability
 
-Every HTTP request produces one structured Serilog event containing:
+Every HTTP request produces a structured Serilog event:
 
 ```
 RequestMethod   GET
@@ -350,36 +359,33 @@ StatusCode      200
 Elapsed         12.3ms
 CorrelationId   a3f9b2c1d4e8f012
 UserId          8d3a1b2c-...
-RequestHost     localhost:5000
-UserAgent       PostmanRuntime/7.36.0
 MachineName     smartexpense-api
 Application     SmartExpense.Api
 ```
 
-**Correlation IDs** are generated per request (16-char hex) or inherited from the incoming `X-Correlation-Id` header — enabling end-to-end tracing across service boundaries. The ID is echoed on every response header so callers can correlate client-side errors to server-side log events.
+The `CorrelationId` is generated per request (16-char hex) or inherited from an incoming `X-Correlation-Id` header, and is echoed on every response. Exception events include `ExceptionType`, `UserId`, and `CorrelationId` as structured properties — Seq queries like `ExceptionType = 'NotFoundException'` or `CorrelationId = 'a3f9b2c1'` surface the full request timeline instantly.
 
-Exception events carry `ExceptionType`, `UserId`, and `CorrelationId` as structured properties, allowing Seq queries like `ExceptionType = 'NotFoundException'` or `CorrelationId = 'a3f9b2c1'` to instantly surface the full request timeline.
-
-Health-check polling is suppressed to `Verbose` level to prevent it from drowning application events.
+Health-check requests are logged at `Verbose` level so they don't drown out application events.
 
 ---
 
 ## CI/CD Pipeline
 
-**CI** runs on every push to `master`, `feat/**`, `fix/**`, `refactor/**`, and `docs/**`, and on every pull request to `master`:
+**CI** runs on every push to `master`, `feat/**`, `fix/**`, `refactor/**`, `docs/**`, and on every pull request to `master`:
 
 ```
-Checkout → Restore → Build (Release) → Run Tests → Upload .trx results
+Checkout → Restore → Build (Release) → Run tests → Upload .trx results
 ```
 
-**CD** runs automatically after CI succeeds on `master`:
+**CD** runs automatically after CI passes on `master`:
 
 ```
-Checkout → Login to GHCR → Build & push multi-tag Docker image
-  Tags: latest, <commit-sha>
+Checkout → Login to GHCR → Build & push Docker image
+  Tags: ghcr.io/kareem-sabry/smartexpense:latest
+        ghcr.io/kareem-sabry/smartexpense:<commit-sha>
 ```
 
-The image is published to `ghcr.io/kareem-sabry/smartexpense`.
+Railway watches the repository and redeploys on every push to `master`, pulling the freshly built image from GHCR.
 
 ---
 
@@ -389,9 +395,8 @@ The image is published to `ghcr.io/kareem-sabry/smartexpense`.
 dotnet test SmartExpense.sln -c Release --verbosity normal
 ```
 
-The test suite covers service, repository, and controller layers using xUnit, Moq, and FluentAssertions, with an in-memory EF Core provider for repository tests.
+The suite covers service, repository, and controller layers using xUnit, Moq, and FluentAssertions. Repository tests use the EF Core in-memory provider.
 
 ```
 130+ unit tests
-90%+ code coverage
 ```
