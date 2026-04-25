@@ -331,12 +331,20 @@ public class AccountService : IAccountService
                          SmartExpense Support Team
                          """;
 
-        await _emailService.SendEmailAsync(
-            user.Email!,
-            "SmartExpense Password Reset",
-            emailBody
-        );
-        _logger.LogInformation("Password reset email sent to: {Email}", user.Email);
+        try
+        {
+            await _emailService.SendEmailAsync(
+                user.Email!,
+                "SmartExpense Password Reset",
+                emailBody
+            );
+            _logger.LogInformation("Password reset email sent to: {Email}", user.Email);
+        }
+        catch (Exception ex)
+        {
+           
+            _logger.LogError(ex, "Failed to send password reset email to {Email}", user.Email);
+        }
 
         return new BasicResponse
         {
