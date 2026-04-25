@@ -16,7 +16,7 @@ public static class DatabaseExtensions
             var dateTimeProvider = serviceProvider.GetRequiredService<IDateTimeProvider>();
             var httpContextAccessor = serviceProvider.GetRequiredService<IHttpContextAccessor>();
 
-            options.UseSqlServer(
+            options.UseNpgsql(
                 configuration.GetConnectionString("DefaultConnection"),
                 sqlOptions => sqlOptions.MigrationsAssembly("SmartExpense.Infrastructure")
             );
