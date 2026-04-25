@@ -562,6 +562,131 @@ public class RecurringTransactionServiceTests
         await act.Should().ThrowAsync<NotFoundException>();
     }
 
+    [Fact]
+    public async Task UpdateAsync_ShouldThrowNotFoundException_WhenCategoryDoesNotExist()
+    {
+        // Arrange
+        var existing = new RecurringTransaction
+        {
+            Id = 1,
+            UserId = _userId,
+            CategoryId = 1,
+            StartDate = new DateTime(2025, 1, 1),
+            Category = new Category { Id = 1, Name = "Rent" }
+        };
+
+        var dto = new RecurringTransactionUpdateDto
+        {
+            CategoryId = 999,
+            Description = "Test",
+            Amount = 100m,
+            TransactionType = TransactionType.Expense,
+            Frequency = RecurrenceFrequency.Monthly
+        };
+
+        _recurringRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        _categoryRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Category?)null);
+
+        // Act
+        Func<Task> act = async () => await _sut.UpdateAsync(1, dto, _userId);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>();
+        _recurringRepositoryMock.Verify(
+            x => x.UpdateAsync(It.IsAny<RecurringTransaction>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ShouldThrowValidationException_WhenCategoryIsInactive()
+    {
+        // Arrange
+        var inactiveCategory = new Category { Id = 1, Name = "Rent", IsActive = false, UserId = _userId };
+        var existing = new RecurringTransaction
+        {
+            Id = 1,
+            UserId = _userId,
+            CategoryId = 1,
+            StartDate = new DateTime(2025, 1, 1),
+            Category = inactiveCategory
+        };
+
+        var dto = new RecurringTransactionUpdateDto
+        {
+            CategoryId = 1,
+            Description = "Test",
+            Amount = 100m,
+            TransactionType = TransactionType.Expense,
+            Frequency = RecurrenceFrequency.Monthly
+        };
+
+        _recurringRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        _categoryRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(inactiveCategory);
+
+        // Act
+        Func<Task> act = async () => await _sut.UpdateAsync(1, dto, _userId);
+
+        // Assert
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage("Cannot update recurring transaction with inactive category");
+        _recurringRepositoryMock.Verify(
+            x => x.UpdateAsync(It.IsAny<RecurringTransaction>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ShouldThrowValidationException_WhenEndDateBeforeStartDate()
+    {
+        // Arrange
+        var category = new Category { Id = 1, Name = "Rent", IsActive = true, UserId = _userId };
+        var existing = new RecurringTransaction
+        {
+            Id = 1,
+            UserId = _userId,
+            CategoryId = 1,
+            StartDate = new DateTime(2025, 3, 1),
+            Category = category
+        };
+
+        var dto = new RecurringTransactionUpdateDto
+        {
+            CategoryId = 1,
+            Description = "Test",
+            Amount = 100m,
+            TransactionType = TransactionType.Expense,
+            Frequency = RecurrenceFrequency.Monthly,
+            EndDate = new DateTime(2025, 2, 1) // Before existing StartDate
+        };
+
+        _recurringRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        _categoryRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(1, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(category);
+
+        // Act
+        Func<Task> act = async () => await _sut.UpdateAsync(1, dto, _userId);
+
+        // Assert
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage("End date must be after the recurring transaction's start date.");
+        _recurringRepositoryMock.Verify(
+            x => x.UpdateAsync(It.IsAny<RecurringTransaction>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     #endregion
 
     #region DeleteAsync Tests
@@ -664,6 +789,24 @@ public class RecurringTransactionServiceTests
 
         // Assert
         result.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ToggleActiveAsync_ShouldThrowNotFoundException_WhenDoesNotExist()
+    {
+        // Arrange
+        _recurringRepositoryMock
+            .Setup(x => x.GetByIdForUserAsync(999, _userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RecurringTransaction?)null);
+
+        // Act
+        Func<Task> act = async () => await _sut.ToggleActiveAsync(999, _userId);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>();
+        _recurringRepositoryMock.Verify(
+            x => x.UpdateAsync(It.IsAny<RecurringTransaction>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     #endregion

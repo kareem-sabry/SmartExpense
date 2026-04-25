@@ -47,6 +47,9 @@ public class RecurringTransactionService : IRecurringTransactionService
         if (!category.IsActive)
             throw new ValidationException("Cannot create recurring transaction with inactive category");
 
+        if (dto.EndDate.HasValue && dto.EndDate.Value <= dto.StartDate)
+            throw new ValidationException("End date cannot be before start date");
+
         var recurring = new RecurringTransaction
         {
             UserId = userId,
