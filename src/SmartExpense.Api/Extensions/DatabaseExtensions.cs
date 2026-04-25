@@ -9,40 +9,56 @@ public static class DatabaseExtensions
 {
     public static IServiceCollection AddDatabase(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<AppDbContext>(options =>
+        
+        services.AddDbContext<AppDbContext>((serviceProvider, options) =>
         {
             var connectionString =
                 configuration.GetConnectionString("DefaultConnection")
                 ?? configuration["DATABASE_URL"];
 
             if (string.IsNullOrWhiteSpace(connectionString))
-                throw new Exception("No database connection string found");
+                throw new InvalidOperationException(
+                    "No database connection string found. " +
+                    "Set ConnectionStrings__DefaultConnection or DATABASE_URL in Railway variables.");
 
-            // Railway uses postgres:// format → convert it
-            if (connectionString.StartsWith("postgres://"))
+            
+            if (connectionString.StartsWith("postgres://") || connectionString.StartsWith("postgresql://"))
             {
-                var uri = new Uri(connectionString);
-
-                var userInfo = uri.UserInfo.Split(':');
-
-                connectionString =
-                    $"Host={uri.Host};" +
-                    $"Port={uri.Port};" +
-                    $"Database={uri.AbsolutePath.Trim('/')};" +
-                    $"Username={userInfo[0]};" +
-                    $"Password={userInfo[1]};" +
-                    "SSL Mode=Require;Trust Server Certificate=true";
+                connectionString = ConvertPostgresUriToNpgsql(connectionString);
             }
 
-            options.UseNpgsql(connectionString);
+            var dateTimeProvider = serviceProvider.GetRequiredService<IDateTimeProvider>();
+            var httpContextAccessor = serviceProvider.GetRequiredService<IHttpContextAccessor>();
+
+            options.UseNpgsql(connectionString, npgsql =>
+            {
+                //tells EF where migrations live (different project from startup)
+                npgsql.MigrationsAssembly("SmartExpense.Infrastructure");
+
+                
+                npgsql.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(10),
+                    errorCodesToAdd: null);
+            });
+
+            
+            options.AddInterceptors(new AuditInterceptor(httpContextAccessor, dateTimeProvider));
         });
+
         return services;
     }
 
     private static string ConvertPostgresUriToNpgsql(string uri)
     {
         var u = new Uri(uri);
-        var userInfo = u.UserInfo.Split(':',2);
-        return $"Host={u.Host};Port={u.Port};Database={u.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+        var userInfo = u.UserInfo.Split(':', 2);
+        return
+            $"Host={u.Host};" +
+            $"Port={u.Port};" +
+            $"Database={u.AbsolutePath.TrimStart('/')};" +
+            $"Username={userInfo[0]};" +
+            $"Password={userInfo[1]};" +
+            "SSL Mode=Require;Trust Server Certificate=true";
     }
 }
