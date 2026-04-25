@@ -40,8 +40,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(RegisterResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest registerRequest)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
-
         var response = await _accountService.RegisterAsync(registerRequest);
 
         if (response.Succeeded) return Ok(response);
@@ -66,19 +64,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequest loginRequest)
     {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            // FIX: was incorrectly returning RegisterResponse on a login action
-            return BadRequest(new LoginResponse
-            {
-                Succeeded = false,
-                Message = string.Join("; ", errors)
-            });
-        }
 
         var response = await _accountService.LoginAsync(loginRequest);
         if (response.Succeeded) return Ok(response);
@@ -102,18 +87,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest refreshTokenRequest)
     {
-        if (!ModelState.IsValid)
-        {
-            var errorMessage = string.Join("; ", ModelState.Values.SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage));
-
-            return BadRequest(new LoginResponse
-            {
-                Succeeded = false,
-                Message = errorMessage
-            });
-        }
-
         var response = await _accountService.RefreshTokenAsync(refreshTokenRequest);
         if (!response.Succeeded) return Unauthorized(response);
 
@@ -193,18 +166,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(BasicResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
-        if (!ModelState.IsValid)
-        {
-            var errorMessage = string.Join("; ", ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage));
-
-            return BadRequest(new BasicResponse
-            {
-                Succeeded = false,
-                Message = errorMessage
-            });
-        }
 
         var response = await _accountService.ForgotPasswordAsync(request);
         return Ok(response);
@@ -224,19 +185,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(BasicResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
-        if (!ModelState.IsValid)
-        {
-            var errorMessage = string.Join("; ", ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage));
-
-            return BadRequest(new BasicResponse
-            {
-                Succeeded = false,
-                Message = errorMessage
-            });
-        }
-
         var response = await _accountService.ResetPasswordAsync(request);
         if (response.Succeeded) return Ok(response);
 

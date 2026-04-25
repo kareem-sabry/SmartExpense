@@ -1,10 +1,11 @@
-﻿using SmartExpense.Application.Interfaces;
+﻿using FluentValidation;
+using SmartExpense.Application.Interfaces;
+using SmartExpense.Application.Validators.Auth;
 using SmartExpense.Core.Models;
 using SmartExpense.Infrastructure.Data;
 using SmartExpense.Infrastructure.Services;
 
 namespace SmartExpense.Api.Extensions;
-
 
 public static class AppServicesExtensions
 {
@@ -19,6 +20,10 @@ public static class AppServicesExtensions
             configuration.GetSection("AdminUser"));
         services.Configure<EmailOptions>(
             configuration.GetSection("EmailOptions"));
+
+        // FluentValidation — discovers all validators in the Application assembly
+        services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>(
+            lifetime: ServiceLifetime.Singleton); // validators are stateless — Singleton is safe and efficient
 
         // Infrastructure
         services.AddScoped<IUnitOfWork, UnitOfWork>();

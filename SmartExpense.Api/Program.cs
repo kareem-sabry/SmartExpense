@@ -25,7 +25,7 @@ try
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
 
-    builder.Services.AddControllers()
+    builder.Services.AddControllers(options => { options.Filters.Add<SmartExpense.Api.Filters.ValidationFilter>(); })
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;

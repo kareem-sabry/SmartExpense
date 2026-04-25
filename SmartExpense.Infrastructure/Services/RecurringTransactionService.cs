@@ -47,10 +47,6 @@ public class RecurringTransactionService : IRecurringTransactionService
         if (!category.IsActive)
             throw new ValidationException("Cannot create recurring transaction with inactive category");
 
-        // Validate dates
-        if (dto.EndDate.HasValue && dto.EndDate.Value < dto.StartDate)
-            throw new ValidationException("End date cannot be before start date");
-
         var recurring = new RecurringTransaction
         {
             UserId = userId,
@@ -89,9 +85,9 @@ public class RecurringTransactionService : IRecurringTransactionService
         if (!category.IsActive)
             throw new ValidationException("Cannot update recurring transaction with inactive category");
 
-        // Validate end date
-        if (dto.EndDate.HasValue && dto.EndDate.Value < recurring.StartDate)
-            throw new ValidationException("End date cannot be before start date");
+        // Domain guard: EndDate must be after the existing StartDate stored in the DB.
+        if (dto.EndDate.HasValue && dto.EndDate.Value <= recurring.StartDate)
+            throw new ValidationException("End date must be after the recurring transaction's start date.");
 
         // Update fields
         recurring.CategoryId = dto.CategoryId;
