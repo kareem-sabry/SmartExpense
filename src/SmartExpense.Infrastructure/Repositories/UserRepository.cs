@@ -18,7 +18,6 @@ public class UserRepository : IUserRepository
         CancellationToken cancellationToken = default)
     {
         return await _context.Users
-            .AsNoTracking()
             .FirstOrDefaultAsync(u => u.RefreshToken == hashedToken, cancellationToken);
     }
 

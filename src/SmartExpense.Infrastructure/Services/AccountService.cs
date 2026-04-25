@@ -19,6 +19,7 @@ public class AccountService : IAccountService
     private readonly IAuthTokenProcessor _authTokenProcessor;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IEmailService _emailService;
+    private readonly IEmailBackgroundQueue _emailQueue;
     private readonly ILogger<AccountService> _logger;
     private readonly RoleManager<IdentityRole<Guid>> _roleManager;
     private readonly UserManager<User> _userManager;
@@ -26,7 +27,8 @@ public class AccountService : IAccountService
 
     public AccountService(IAuthTokenProcessor authTokenProcessor, UserManager<User> userManager,
         RoleManager<IdentityRole<Guid>> roleManager, IUnitOfWork unitOfWork,
-        ILogger<AccountService> logger, IDateTimeProvider dateTimeProvider, IEmailService emailService)
+        ILogger<AccountService> logger, IDateTimeProvider dateTimeProvider, IEmailService emailService,
+        IEmailBackgroundQueue emailQueue)
     {
         _authTokenProcessor = authTokenProcessor;
         _userManager = userManager;
@@ -35,6 +37,7 @@ public class AccountService : IAccountService
         _logger = logger;
         _dateTimeProvider = dateTimeProvider;
         _emailService = emailService;
+        _emailQueue = emailQueue;
     }
 
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest registerRequest,
@@ -66,7 +69,6 @@ public class AccountService : IAccountService
         }
 
         var identityRoleName = GetIdentityRoleName(registerRequest.Role);
-
         var roleExists = await _roleManager.RoleExistsAsync(identityRoleName);
 
         if (!roleExists)
@@ -80,7 +82,6 @@ public class AccountService : IAccountService
                 Errors = new[] { ErrorMessages.RoleDoesNotExist }
             };
         }
-
 
         var user = User.Create(registerRequest.Email, registerRequest.FirstName, registerRequest.LastName,
             _dateTimeProvider.UtcNow);
@@ -121,11 +122,8 @@ public class AccountService : IAccountService
         if (user == null)
         {
             _logger.LogWarning("Failed login attempt for email: {Email}", loginRequest.Email);
-
             return new LoginResponse { Succeeded = false, Message = ErrorMessages.InvalidCredentials };
         }
-
-        // Check lockout BEFORE attempting the password so that brute-force is stopped even if the attacker knows the correct password.
 
         if (await _userManager.IsLockedOutAsync(user))
         {
@@ -135,12 +133,10 @@ public class AccountService : IAccountService
 
         if (!await _userManager.CheckPasswordAsync(user, loginRequest.Password))
         {
-            // Increment the failure counter — Identity will trigger lockout automatically once MaxFailedAccessAttempts (configured as 5) is reached.
             await _userManager.AccessFailedAsync(user);
             _logger.LogWarning("Failed login attempt for email: {Email}", loginRequest.Email);
             return new LoginResponse { Succeeded = false, Message = ErrorMessages.InvalidCredentials };
         }
-        // Successful login — reset the counter so a future run of 5 failures starts fresh.
 
         await _userManager.ResetAccessFailedCountAsync(user);
 
@@ -149,12 +145,11 @@ public class AccountService : IAccountService
 
         var refreshTokenValue = _authTokenProcessor.GenerateRefreshToken();
         var hashedRefreshToken = HashToken(refreshTokenValue);
-
         var refreshTokenExpirationDateInUtc =
             _dateTimeProvider.UtcNow.AddDays(ApplicationConstants.RefreshTokenExpirationDays);
 
         user.RefreshToken = hashedRefreshToken;
-        user.PreviousRefreshTokenHash = null; // fresh login resets reuse-detection state
+        user.PreviousRefreshTokenHash = null;
         user.RefreshTokenExpiresAtUtc = refreshTokenExpirationDateInUtc;
 
         await _userManager.UpdateAsync(user);
@@ -166,7 +161,7 @@ public class AccountService : IAccountService
             Message = SuccessMessages.LoginSuccessful,
             AccessToken = jwtToken,
             ExpiresAtUtc = expirationDateInUtc,
-            RefreshToken = refreshTokenValue // plain token goes to client only
+            RefreshToken = refreshTokenValue
         };
     }
 
@@ -178,12 +173,7 @@ public class AccountService : IAccountService
         if (user == null)
         {
             _logger.LogWarning("Account deletion attempted for non-existent user: {Email}", userEmail);
-
-            return new BasicResponse
-            {
-                Succeeded = false,
-                Message = ErrorMessages.UserNotFound
-            };
+            return new BasicResponse { Succeeded = false, Message = ErrorMessages.UserNotFound };
         }
 
         var result = await _userManager.DeleteAsync(user);
@@ -192,39 +182,24 @@ public class AccountService : IAccountService
             _logger.LogError("Failed to delete account for {Email}: {Errors}",
                 userEmail,
                 string.Join(", ", result.Errors.Select(e => e.Description)));
-
-            return new BasicResponse
-            {
-                Succeeded = false,
-                Message = ErrorMessages.OperationFailed
-            };
+            return new BasicResponse { Succeeded = false, Message = ErrorMessages.OperationFailed };
         }
 
         _logger.LogInformation("Account deleted successfully: {Email}", userEmail);
-
-        return new BasicResponse
-        {
-            Succeeded = true,
-            Message = SuccessMessages.AccountDeleted
-        };
+        return new BasicResponse { Succeeded = true, Message = SuccessMessages.AccountDeleted };
     }
 
     public async Task<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest refreshTokenRequest,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(refreshTokenRequest.RefreshToken))
-            return new RefreshTokenResponse
-            {
-                Succeeded = false,
-                Message = ErrorMessages.RefreshTokenMissing
-            };
+            return new RefreshTokenResponse { Succeeded = false, Message = ErrorMessages.RefreshTokenMissing };
 
         var hashedIncomingToken = HashToken(refreshTokenRequest.RefreshToken);
         var user = await _unitOfWork.Users.GetUserByRefreshTokenAsync(hashedIncomingToken, cancellationToken);
 
         if (user == null)
         {
-            // Token not matched as current — check if it was a recently rotated token (reuse attack)
             var compromisedUser = await _unitOfWork.Users
                 .GetUserByPreviousRefreshTokenHashAsync(hashedIncomingToken, cancellationToken);
 
@@ -234,8 +209,7 @@ public class AccountService : IAccountService
                 compromisedUser.PreviousRefreshTokenHash = null;
                 compromisedUser.RefreshTokenExpiresAtUtc = null;
                 await _userManager.UpdateAsync(compromisedUser);
-                _logger.LogWarning(
-                    "Refresh token reuse detected for user {UserId} — all tokens revoked",
+                _logger.LogWarning("Refresh token reuse detected for user {UserId} — all tokens revoked",
                     compromisedUser.Id);
             }
             else
@@ -243,22 +217,13 @@ public class AccountService : IAccountService
                 _logger.LogWarning("Invalid refresh token attempt — token not recognised");
             }
 
-            return new RefreshTokenResponse
-            {
-                Succeeded = false,
-                Message = ErrorMessages.RefreshTokenInvalid
-            };
+            return new RefreshTokenResponse { Succeeded = false, Message = ErrorMessages.RefreshTokenInvalid };
         }
 
         if (user.RefreshTokenExpiresAtUtc < _dateTimeProvider.UtcNow)
         {
             _logger.LogInformation("Expired refresh token used for user: {Email}", user.Email);
-
-            return new RefreshTokenResponse
-            {
-                Succeeded = false,
-                Message = ErrorMessages.RefreshTokenExpired
-            };
+            return new RefreshTokenResponse { Succeeded = false, Message = ErrorMessages.RefreshTokenExpired };
         }
 
         var roles = await _userManager.GetRolesAsync(user);
@@ -269,7 +234,7 @@ public class AccountService : IAccountService
         var refreshExpirationDateInUtc =
             _dateTimeProvider.UtcNow.AddDays(ApplicationConstants.RefreshTokenExpirationDays);
 
-        user.PreviousRefreshTokenHash = user.RefreshToken; // slide the window — old hash enables reuse detection
+        user.PreviousRefreshTokenHash = user.RefreshToken;
         user.RefreshToken = hashedNewToken;
         user.RefreshTokenExpiresAtUtc = refreshExpirationDateInUtc;
         await _userManager.UpdateAsync(user);
@@ -282,7 +247,7 @@ public class AccountService : IAccountService
             Message = SuccessMessages.TokenRefreshed,
             AccessToken = jwtToken,
             ExpiresAtUtc = expirationDateInUtc,
-            RefreshToken = refreshTokenValue // plain token to client only
+            RefreshToken = refreshTokenValue
         };
     }
 
@@ -291,25 +256,17 @@ public class AccountService : IAccountService
     {
         var user = await _userManager.FindByEmailAsync(request.Email);
 
+        // Always return success — never reveal whether the email is registered
         if (user == null)
         {
             _logger.LogInformation("Password reset requested for non-existent email: {Email}", request.Email);
-
-            return new BasicResponse
-            {
-                Succeeded = true,
-                Message = SuccessMessages.PasswordResetEmailSent
-            };
+            return new BasicResponse { Succeeded = true, Message = SuccessMessages.PasswordResetEmailSent };
         }
 
         var rawToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-        // ASP.NET Identity tokens contain '+', '/', '=' which some email clients
-        // silently modify or line-wrap. URL-encode so the token survives the round-trip.
         var encodedToken = Uri.EscapeDataString(rawToken);
         var encodedEmail = Uri.EscapeDataString(user.Email!);
 
-        // Build a deep-link that your frontend can consume directly.
-        // Replace the base URL with your actual frontend origin in production.
         var resetLink =
             $"https://app.smartexpense.com/reset-password?token={encodedToken}&email={encodedEmail}";
 
@@ -331,27 +288,13 @@ public class AccountService : IAccountService
                          SmartExpense Support Team
                          """;
 
-        try
-        {
-            await _emailService.SendEmailAsync(
-                user.Email!,
-                "SmartExpense Password Reset",
-                emailBody
-            );
-            _logger.LogInformation("Password reset email sent to: {Email}", user.Email);
-        }
-        catch (Exception ex)
-        {
-           
-            _logger.LogError(ex, "Failed to send password reset email to {Email}", user.Email);
-        }
+        // ↓ Fire-and-forget: returns in microseconds, SMTP runs on background thread
+        _emailQueue.Enqueue(user.Email!, "SmartExpense Password Reset", emailBody);
+        _logger.LogInformation("Password reset email queued for {Email}", user.Email);
 
-        return new BasicResponse
-        {
-            Succeeded = true,
-            Message = SuccessMessages.PasswordResetEmailSent
-        };
+        return new BasicResponse { Succeeded = true, Message = SuccessMessages.PasswordResetEmailSent };
     }
+
 
     public async Task<BasicResponse> ResetPasswordAsync(ResetPasswordRequest request,
         CancellationToken cancellationToken = default)
@@ -361,15 +304,9 @@ public class AccountService : IAccountService
         if (user == null)
         {
             _logger.LogWarning("Password reset attempted for non-existent email: {Email}", request.Email);
-
-            return new BasicResponse
-            {
-                Succeeded = false,
-                Message = ErrorMessages.InvalidPasswordResetRequest
-            };
+            return new BasicResponse { Succeeded = false, Message = ErrorMessages.InvalidPasswordResetRequest };
         }
 
-        // Decode the token that arrived URL-encoded from the email link.
         var decodedToken = Uri.UnescapeDataString(request.ResetCode);
         var result = await _userManager.ResetPasswordAsync(user, decodedToken, request.NewPassword);
 
@@ -390,12 +327,7 @@ public class AccountService : IAccountService
         await _userManager.UpdateAsync(user);
 
         _logger.LogInformation("Password reset successfully for: {Email}", user.Email);
-
-        return new BasicResponse
-        {
-            Succeeded = true,
-            Message = SuccessMessages.PasswordResetSuccessful
-        };
+        return new BasicResponse { Succeeded = true, Message = SuccessMessages.PasswordResetSuccessful };
     }
 
     public async Task<LogoutResponse> LogoutAsync(string userEmail, CancellationToken cancellationToken = default)
@@ -404,26 +336,15 @@ public class AccountService : IAccountService
         if (user == null)
         {
             _logger.LogWarning("Logout attempted for non-existent user: {Email}", userEmail);
-
-            return new LogoutResponse
-            {
-                Succeeded = false,
-                Message = ErrorMessages.UserNotFound
-            };
+            return new LogoutResponse { Succeeded = false, Message = ErrorMessages.UserNotFound };
         }
 
-        // Invalidate the refresh token
         user.RefreshToken = null;
         user.RefreshTokenExpiresAtUtc = null;
         await _userManager.UpdateAsync(user);
 
         _logger.LogInformation("User logged out: {Email}", userEmail);
-
-        return new LogoutResponse
-        {
-            Succeeded = true,
-            Message = SuccessMessages.LogoutSuccessful
-        };
+        return new LogoutResponse { Succeeded = true, Message = SuccessMessages.LogoutSuccessful };
     }
 
     public async Task<UserProfileDto?> GetCurrentUserAsync(string userEmail,
