@@ -7,13 +7,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\SmartExpense.Application\SmartExpense.Application.csproj"/>
-        <ProjectReference Include="..\SmartExpense.Core\SmartExpense.Core.csproj"/>
+        <ProjectReference Include="..\SmartExpense.Application\SmartExpense.Application.csproj" />
+        <ProjectReference Include="..\SmartExpense.Core\SmartExpense.Core.csproj" />
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.3.9" />
-        <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.4"/>
+        <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.4" />
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.4" />  <!-- add this -->
         <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.0.1" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
@@ -21,6 +21,7 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+        <PackageReference Include="SendGrid" Version="9.29.3" />
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.1" />
     </ItemGroup>
 

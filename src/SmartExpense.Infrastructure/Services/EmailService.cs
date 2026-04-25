@@ -1,7 +1,7 @@
-﻿using System.Net;
-using System.Net.Mail;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 using SmartExpense.Application.Interfaces;
 using SmartExpense.Core.Models;
 
@@ -9,46 +9,52 @@ namespace SmartExpense.Infrastructure.Services;
 
 public class EmailService : IEmailService
 {
-    private readonly EmailOptions _emailOptions;
+    private readonly EmailOptions _options;
     private readonly ILogger<EmailService> _logger;
 
-    public EmailService(IOptions<EmailOptions> emailOptions, ILogger<EmailService> logger)
+    public EmailService(
+        IOptions<EmailOptions> options,
+        ILogger<EmailService> logger)
     {
-        _emailOptions = emailOptions.Value;
+        _options = options.Value;
         _logger = logger;
     }
 
     public async Task SendEmailAsync(string toEmail, string subject, string body)
     {
-        // Guard: if SMTP is not configured (e.g. Railway without EmailOptions vars set),
-        // log a clear warning and return instead of throwing an obscure ArgumentException.
-        if (string.IsNullOrWhiteSpace(_emailOptions.SmtpHost) ||
-            string.IsNullOrWhiteSpace(_emailOptions.FromEmail))
+        if (string.IsNullOrWhiteSpace(_options.ApiKey))
         {
-            _logger.LogWarning(
-                "Email to {ToEmail} was skipped — SMTP is not configured. " +
-                "Set EmailOptions__SmtpHost, EmailOptions__FromEmail, EmailOptions__SmtpUsername, " +
-                "EmailOptions__SmtpPassword in Railway variables to enable email delivery.",
-                toEmail);
+            _logger.LogWarning("SendGrid API key is missing. Email skipped for {ToEmail}", toEmail);
             return;
         }
 
-        using var message = new MailMessage
-        {
-            From = new MailAddress(_emailOptions.FromEmail, _emailOptions.FromName),
-            Subject = subject,
-            Body = body,
-            IsBodyHtml = false
-        };
-        message.To.Add(toEmail);
+        var client = new SendGridClient(_options.ApiKey);
 
-        using var smtp = new SmtpClient(_emailOptions.SmtpHost, _emailOptions.SmtpPort)
-        {
-            Credentials = new NetworkCredential(_emailOptions.SmtpUsername, _emailOptions.SmtpPassword),
-            EnableSsl = true
-        };
+        var from = new EmailAddress(_options.FromEmail, _options.FromName);
+        var to = new EmailAddress(toEmail);
 
-        await smtp.SendMailAsync(message);
+        var msg = MailHelper.CreateSingleEmail(
+            from,
+            to,
+            subject,
+            plainTextContent: body,
+            htmlContent: body
+        );
+
+        var response = await client.SendEmailAsync(msg);
+
+        if ((int)response.StatusCode >= 400)
+        {
+            var responseBody = await response.Body.ReadAsStringAsync();
+
+            _logger.LogError(
+                "SendGrid failed. Status: {Status}, Body: {Body}",
+                response.StatusCode,
+                responseBody);
+
+            throw new Exception($"SendGrid failed: {response.StatusCode}");
+        }
+
         _logger.LogInformation("Email sent successfully to {ToEmail}", toEmail);
     }
 }
