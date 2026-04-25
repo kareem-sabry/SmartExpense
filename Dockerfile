@@ -3,17 +3,16 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Copy project files first — lets Docker cache the restore layer
-COPY ["SmartExpense.Api/SmartExpense.Api.csproj",                         "SmartExpense.Api/"]
-COPY ["SmartExpense.Application/SmartExpense.Application.csproj",         "SmartExpense.Application/"]
-COPY ["SmartExpense.Core/SmartExpense.Core.csproj",                       "SmartExpense.Core/"]
-COPY ["SmartExpense.Infrastructure/SmartExpense.Infrastructure.csproj",   "SmartExpense.Infrastructure/"]
-
-RUN dotnet restore "SmartExpense.Api/SmartExpense.Api.csproj"
+COPY ["src/SmartExpense.Api/SmartExpense.Api.csproj",               "src/SmartExpense.Api/"]
+COPY ["src/SmartExpense.Application/SmartExpense.Application.csproj","src/SmartExpense.Application/"]
+COPY ["src/SmartExpense.Core/SmartExpense.Core.csproj",             "src/SmartExpense.Core/"]
+COPY ["src/SmartExpense.Infrastructure/SmartExpense.Infrastructure.csproj","src/SmartExpense.Infrastructure/"]
+RUN dotnet restore "src/SmartExpense.Api/SmartExpense.Api.csproj"
 
 # Copy the rest of the source and publish in one step.
 
 COPY . .
-RUN dotnet publish "SmartExpense.Api/SmartExpense.Api.csproj" \
+RUN dotnet publish "src/SmartExpense.Api/SmartExpense.Api.csproj" \
     -c Release -o /app/publish /p:UseAppHost=false
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────

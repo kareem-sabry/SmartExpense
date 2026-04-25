@@ -22,8 +22,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\SmartExpense.Api\SmartExpense.Api.csproj"/>
-        <ProjectReference Include="..\SmartExpense.Infrastructure\SmartExpense.Infrastructure.csproj"/>
+        <ProjectReference Include="..\..\src\SmartExpense.Api\SmartExpense.Api.csproj"/>
+        <ProjectReference Include="..\..\src\SmartExpense.Infrastructure\SmartExpense.Infrastructure.csproj"/>
     </ItemGroup>
 
 </Project>

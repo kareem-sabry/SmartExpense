@@ -1,14 +1,14 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartExpense.Api", "SmartExpense.Api\SmartExpense.Api.csproj", "{7FC5ADC8-8E2C-40A6-B01C-1C06C6529AC8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartExpense.Api", "src\SmartExpense.Api\SmartExpense.Api.csproj", "{7FC5ADC8-8E2C-40A6-B01C-1C06C6529AC8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartExpense.Application", "SmartExpense.Application\SmartExpense.Application.csproj", "{1C6E865A-A6EC-4AB1-9ADF-9774E8CE0EB4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartExpense.Application", "src\SmartExpense.Application\SmartExpense.Application.csproj", "{1C6E865A-A6EC-4AB1-9ADF-9774E8CE0EB4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartExpense.Core", "SmartExpense.Core\SmartExpense.Core.csproj", "{A6FC01A7-DF50-4246-B1D4-096C98F1F12B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartExpense.Core", "src\SmartExpense.Core\SmartExpense.Core.csproj", "{A6FC01A7-DF50-4246-B1D4-096C98F1F12B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartExpense.Infrastructure", "SmartExpense.Infrastructure\SmartExpense.Infrastructure.csproj", "{31142099-46CC-4D5B-B815-3CAC1654633A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartExpense.Infrastructure", "src\SmartExpense.Infrastructure\SmartExpense.Infrastructure.csproj", "{31142099-46CC-4D5B-B815-3CAC1654633A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartExpense.Tests", "SmartExpense.Tests\SmartExpense.Tests.csproj", "{CA211082-6E62-47DD-AB65-C737C7DAB3BB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartExpense.Tests", "tests\SmartExpense.Tests\SmartExpense.Tests.csproj", "{CA211082-6E62-47DD-AB65-C737C7DAB3BB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
