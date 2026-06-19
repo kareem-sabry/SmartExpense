@@ -1,4 +1,5 @@
-﻿using SmartExpense.Application.Interfaces;
+﻿using System;
+using SmartExpense.Application.Interfaces;
 
 namespace SmartExpense.Infrastructure.Services;
 
