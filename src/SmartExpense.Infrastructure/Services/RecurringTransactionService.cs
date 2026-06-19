@@ -202,7 +202,7 @@ public class RecurringTransactionService : IRecurringTransactionService
                 Description = $"{recurring.Description} (Auto-generated)",
                 Amount = recurring.Amount,
                 TransactionType = recurring.TransactionType,
-                TransactionDate = dueDate,
+                TransactionDate = dueDate.Date,
                 Notes = recurring.Notes,
                 // Stamp the FK so deduplication is reliable on future runs
                 RecurringTransactionId = recurring.Id

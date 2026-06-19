@@ -71,7 +71,7 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
                 .IsRequired(false)
                 .OnDelete(DeleteBehavior.NoAction);
         });
-
+    
         builder.Entity<Budget>(entity =>
         {
             entity.HasKey(b => b.Id);
@@ -131,7 +131,13 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
         builder.Entity<Transaction>()
             .HasIndex(t => new { t.UserId, t.CategoryId })
             .HasDatabaseName("IX_Transactions_UserId_CategoryId");
+        
 
+        builder.Entity<Transaction>()
+            .HasIndex(t => new { t.RecurringTransactionId, t.TransactionDate })
+            .HasDatabaseName("UIX_Transactions_RecurringId_Date")
+            .IsUnique()
+            .HasFilter("[RecurringTransactionId] IS NOT NULL");
         // GetByMonthYearAsync always filters on all three columns; the composite
         // order matches the most selective narrowing (user → month → year).
         builder.Entity<Budget>()
