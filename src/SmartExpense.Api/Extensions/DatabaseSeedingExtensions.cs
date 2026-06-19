@@ -14,7 +14,10 @@ public static class DatabaseSeedingExtensions
         using var scope = app.Services.CreateScope();
 
         var services = scope.ServiceProvider;
-        var logger = services.GetRequiredService<ILogger<Program>>();
+
+        var logger = services
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger(nameof(DatabaseSeedingExtensions));
 
         try
         {
@@ -38,7 +41,10 @@ public static class DatabaseSeedingExtensions
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "An error occurred while seeding the database.");
+            // rethrow so Railway shows the real startup error instead of
+            // starting a zombie process where every API call returns 500.
+            logger.LogCritical(ex, "Database seeding failed. Stopping application.");
+            throw;
         }
     }
 }

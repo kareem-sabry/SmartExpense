@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 using Serilog.Events;
 using SmartExpense.Api.Extensions;
@@ -37,7 +38,7 @@ try
         .AddIdentityConfiguration()
         .AddJwtAuthentication(builder.Configuration)
         .AddRateLimiting()
-        .AddCorsConfiguration()
+        .AddCorsConfiguration(builder.Configuration)
         .AddSwaggerConfiguration()
         .AddApplicationServices(builder.Configuration)
         .AddHealthChecks()
@@ -46,9 +47,15 @@ try
     var app = builder.Build();
 
     await app.SeedDatabaseAsync();
+    
+    // =========================
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    });
 
     // =========================
-    // OBSERVABILITY (OUTERMOST)
+    // OBSERVABILITY (outermost — captures everything)
     // =========================
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseStructuredRequestLogging();
@@ -58,40 +65,43 @@ try
     // =========================
     app.UseExceptionHandler();
 
-    // =========================
-    // ENVIRONMENT CONFIG
-    // =========================
-    if (app.Environment.IsDevelopment())
+    if (!app.Environment.IsDevelopment())
     {
-        app.UseSwagger();
-        app.UseSwaggerUI(options =>
-        {
-            options.SwaggerEndpoint("/swagger/v1/swagger.json", "SmartExpense API v1");
-            options.RoutePrefix = string.Empty;
-        });
-
-        app.UseCors("DevelopmentPolicy");
-    }
-    else
-    {
-        app.UseCors("ProductionPolicy");
         app.UseHsts();
     }
+    
 
-    // =========================
-    // SECURITY & CORE PIPELINE
-    // =========================
     app.UseSecurityHeaders();
-    app.UseHttpsRedirection();
 
+    
+
+    app.UseCors("DefaultCorsPolicy");
+
+    // =========================
+    // SWAGGER — always enabled server at root /
+    // =========================
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "SmartExpense API v1");
+        var exposeSwagger = app.Configuration["EXPOSE_SWAGGER"] == "true";
+        c.RoutePrefix = exposeSwagger ? string.Empty : "docs";
+    });
+
+    // =========================
+    // RATE LIMITING
+    // =========================
     app.UseRateLimiter();
 
+    // =========================
+    // AUTHENTICATION & AUTHORIZATION
+    // =========================
     app.UseAuthentication();
     app.UseAuthorization();
 
     app.MapControllers();
 
-    // Health checks (excluded from rate limiting)
+    // Health checks — excluded from rate limiting; used by Railway liveness probe
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = async (context, report) =>

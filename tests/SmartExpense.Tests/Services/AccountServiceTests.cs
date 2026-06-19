@@ -14,6 +14,7 @@ using ForgotPasswordRequest = SmartExpense.Application.Dtos.Auth.ForgotPasswordR
 using LoginRequest = SmartExpense.Application.Dtos.Auth.LoginRequest;
 using RegisterRequest = SmartExpense.Application.Dtos.Auth.RegisterRequest;
 using ResetPasswordRequest = SmartExpense.Application.Dtos.Auth.ResetPasswordRequest;
+
 namespace SmartExpense.Tests.Services;
 
 public class AccountServiceTests
@@ -26,6 +27,7 @@ public class AccountServiceTests
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
     private readonly Mock<IEmailService> _emailServiceMock;
+    private readonly Mock<IEmailBackgroundQueue> _emailQueueMock;
 
     private readonly AccountService _sut;
 
@@ -48,6 +50,7 @@ public class AccountServiceTests
         _userRepositoryMock = new Mock<IUserRepository>();
         _dateTimeProviderMock = new Mock<IDateTimeProvider>();
         _emailServiceMock = new Mock<IEmailService>();
+        _emailQueueMock = new Mock<IEmailBackgroundQueue>();
 
         _dateTimeProviderMock.Setup(x => x.UtcNow).Returns(_fixedNow);
         _unitOfWorkMock.Setup(x => x.Users).Returns(_userRepositoryMock.Object);
@@ -59,7 +62,8 @@ public class AccountServiceTests
             _unitOfWorkMock.Object,
             Mock.Of<ILogger<AccountService>>(),
             _dateTimeProviderMock.Object,
-            _emailServiceMock.Object);
+            _emailServiceMock.Object,
+            _emailQueueMock.Object);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -453,10 +457,10 @@ public class AccountServiceTests
         result.Message.Should().Be(SuccessMessages.PasswordResetEmailSent);
 
         // Assert — email was actually sent
-        _emailServiceMock.Verify(x => x.SendEmailAsync(
+        _emailQueueMock.Verify(x => x.Enqueue(
             user.Email!,
             It.IsAny<string>(),
-            It.Is<string>(body => body.Contains("reset-password") && !body.Contains("raw+token/==")) // URL-encoded
+            It.Is<string>(body => body.Contains("reset-password") && !body.Contains("raw+token/=="))
         ), Times.Once);
     }
 
