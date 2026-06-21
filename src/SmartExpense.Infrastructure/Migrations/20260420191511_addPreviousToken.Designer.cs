@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SmartExpense.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using SmartExpense.Infrastructure.Data;
 namespace SmartExpense.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260420191511_addPreviousToken")]
+    partial class addPreviousToken
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -375,10 +378,7 @@ namespace SmartExpense.Infrastructure.Migrations
 
                     b.HasIndex("CategoryId");
 
-                    b.HasIndex("RecurringTransactionId", "TransactionDate")
-                        .IsUnique()
-                        .HasDatabaseName("UIX_Transactions_RecurringId_Date")
-                        .HasFilter("RecurringTransactionId IS NOT NULL");
+                    b.HasIndex("RecurringTransactionId");
 
                     b.HasIndex("UserId", "CategoryId")
                         .HasDatabaseName("IX_Transactions_UserId_CategoryId");
@@ -453,8 +453,8 @@ namespace SmartExpense.Infrastructure.Migrations
                         .HasColumnType("nvarchar(88)");
 
                     b.Property<string>("RefreshToken")
-                        .HasMaxLength(88)
-                        .HasColumnType("nvarchar(88)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTime?>("RefreshTokenExpiresAtUtc")
                         .HasColumnType("datetime2");

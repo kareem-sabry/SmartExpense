@@ -8,8 +8,7 @@
       - "5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=SmartExpense;Username=postgres;Password=${DB_PASSWORD}
-      - MultipleActiveResultSets=true
+      - ConnectionStrings__DefaultConnection=Server=db;Database=SmartExpense;User Id=sa;Password=${DB_PASSWORD};TrustServerCertificate=true;MultipleActiveResultSets=true
       - JwtOptions__Secret=${JWT_SECRET}
       - JwtOptions__Issuer=SmartExpenseApi
       - JwtOptions__Audience=SmartExpenseClient
@@ -25,9 +24,15 @@
       seq:
         condition: service_started
     restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   seq:
-    image: datalust/seq:latest
+    image: datalust/seq:2025.2
     container_name: smartexpense-seq
     environment:
       ACCEPT_EULA: Y
@@ -41,23 +46,24 @@
     restart: unless-stopped
 
   db:
-    image: postgres:16-alpine
+    image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: smartexpense-db
     environment:
-      POSTGRES_DB: SmartExpense
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${DB_PASSWORD}
+      - MSSQL_PID=Express
     ports:
-      - "5432:5432"
+      - "1433:1433"
     volumes:
-      - sqldata:/var/lib/postgresql/data
+      - sqldata:/var/opt/mssql
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      test: [ "CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${DB_PASSWORD} -Q 'SELECT 1' -C || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
     restart: unless-stopped
 
 volumes:
   sqldata:
-  seqdata:            
+  seqdata:
