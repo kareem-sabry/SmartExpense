@@ -177,6 +177,51 @@ public class RecurringTransactionService : IRecurringTransactionService
         };
     }
 
+    public async Task<SystemGenerationResultDto> GenerateAllDueAsync(CancellationToken cancellationToken = default)
+    {
+        var now = _dateTimeProvider.UtcNow;
+
+        var dueTemplates = await _unitOfWork.RecurringTransactions.GetDueForGenerationAsync(now, cancellationToken);
+
+        var result = new SystemGenerationResultDto { TemplatesProcessed = dueTemplates.Count };
+
+        foreach (var template in dueTemplates)
+        {
+            try
+            {
+                // Reuse the same private helper that user-facing endpoints call.
+                // No business logic is duplicated. The only difference between this
+                // path and GenerateTransactionsAsync is which templates we hand in:
+                // that method gets one user's active templates,
+                // this method gets all users' active templates.
+                var generated = await GenerateTransactionsForRecurring(template, now, cancellationToken);
+
+                result.TransactionsGenerated += generated.Count;
+            }
+            catch (Exception ex)
+            {
+                // Per-template isolation: capture the failure and continue.
+                // Without this try/catch, one template with corrupt data would
+                // abort the entire sweep, leaving every other user's templates
+                // unprocessed for the day.
+                //
+                // The calling job logs each failure as a separate structured entry
+                // so it's queryable by RecurringTransactionId or UserId in Seq.
+
+                result.FailedTemplates++;
+                result.Failures.Add(new TemplateFailureInfo
+                {
+                    RecurringTransactionId = template.Id,
+                    UserId = template.UserId,
+                    Error = ex.Message
+                });
+            }
+        }
+
+
+        return result;
+    }
+
     #region Private Helper Methods
 
     private async Task<List<GeneratedTransactionInfo>> GenerateTransactionsForRecurring(

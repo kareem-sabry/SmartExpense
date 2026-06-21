@@ -25,4 +25,6 @@ public interface IRecurringTransactionService
 
     Task<GenerateTransactionsResultDto> GenerateForRecurringTransactionAsync(int recurringId, Guid userId,
         CancellationToken cancellationToken = default);
+
+    Task<SystemGenerationResultDto> GenerateAllDueAsync(CancellationToken cancellationToken = default);
 }
