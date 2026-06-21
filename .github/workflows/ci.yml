@@ -9,10 +9,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      AutoMapper__LicenseKey: ${{ secrets.AUTOMAPPER_LICENSE_KEY }}
 
     steps:
       - name: Checkout
@@ -35,13 +43,9 @@ jobs:
         run: dotnet restore SmartExpense.sln
 
       - name: Build
-        env:
-          AutoMapper__LicenseKey: ${{ secrets.AUTOMAPPER_LICENSE_KEY }}
         run: dotnet build SmartExpense.sln --no-restore -c Release
 
       - name: Run tests
-        env:
-          AutoMapper__LicenseKey: ${{ secrets.AUTOMAPPER_LICENSE_KEY }}
         run: >
           dotnet test SmartExpense.sln
           --no-build
