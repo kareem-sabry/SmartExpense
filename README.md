@@ -4,6 +4,7 @@ A personal finance REST API built with .NET 9 and Clean Architecture. Tracks inc
 
 [![CI](https://github.com/kareem-sabry/SmartExpense/actions/workflows/ci.yml/badge.svg)](https://github.com/kareem-sabry/SmartExpense/actions/workflows/ci.yml)
 [![CD](https://github.com/kareem-sabry/SmartExpense/actions/workflows/cd.yml/badge.svg)](https://github.com/kareem-sabry/SmartExpense/actions/workflows/cd.yml)
+
 ![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![License](https://img.shields.io/github/license/kareem-sabry/SmartExpense)
