@@ -10,10 +10,9 @@ COPY ["src/SmartExpense.Infrastructure/SmartExpense.Infrastructure.csproj","src/
 RUN dotnet restore "src/SmartExpense.Api/SmartExpense.Api.csproj"
 
 # Copy the rest of the source and publish in one step.
-
 COPY . .
 RUN dotnet publish "src/SmartExpense.Api/SmartExpense.Api.csproj" \
-    -c Release -o /app/publish /p:UseAppHost=false
+    -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final

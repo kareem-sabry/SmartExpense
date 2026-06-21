@@ -137,7 +137,7 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
             .HasIndex(t => new { t.RecurringTransactionId, t.TransactionDate })
             .HasDatabaseName("UIX_Transactions_RecurringId_Date")
             .IsUnique()
-            .HasFilter("[RecurringTransactionId] IS NOT NULL");
+            .HasFilter("RecurringTransactionId IS NOT NULL");
         // GetByMonthYearAsync always filters on all three columns; the composite
         // order matches the most selective narrowing (user → month → year).
         builder.Entity<Budget>()

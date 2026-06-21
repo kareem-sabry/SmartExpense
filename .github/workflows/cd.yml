@@ -1,13 +1,15 @@
 ﻿name: CD
 
-# Run only after CI completes successfully on master.
-# This prevents a broken build from producing a Docker image on the same commit.
 on:
   workflow_run:
     workflows: ["CI"]
     types:
       - completed
     branches: [master]
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build-and-push:
@@ -19,13 +21,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -34,4 +38,4 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/smartexpense:latest
-            ghcr.io/${{ github.repository_owner }}/smartexpense:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/smartexpense:${{ github.event.workflow_run.head_sha }}

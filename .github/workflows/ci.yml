@@ -2,9 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [ master, 'fix/**', 'feat/**', 'refactor/**', 'docs/**' ]
+    branches: [ master, 'fix/**', 'feat/**', 'refactor/**', 'docs/**', 'test/**' ]
   pull_request:
     branches: [ master ]
+
+permissions:
+  contents: read
 
 jobs:
   build-and-test:
@@ -20,25 +23,43 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
       - name: Restore dependencies
         run: dotnet restore SmartExpense.sln
 
       - name: Build
+        env:
+          AutoMapper__LicenseKey: ${{ secrets.AUTOMAPPER_LICENSE_KEY }}
         run: dotnet build SmartExpense.sln --no-restore -c Release
 
       - name: Run tests
+        env:
+          AutoMapper__LicenseKey: ${{ secrets.AUTOMAPPER_LICENSE_KEY }}
         run: >
           dotnet test SmartExpense.sln
           --no-build
           -c Release
           --verbosity normal
           --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
-        timeout-minutes: 2
         with:
           name: test-results
           path: '**/test-results.trx'
-          if-no-files-found: warn
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: '**/coverage.cobertura.xml'

@@ -19,7 +19,7 @@ namespace SmartExpense.Infrastructure.Migrations
                 table: "Transactions",
                 columns: new[] { "RecurringTransactionId", "TransactionDate" },
                 unique: true,
-                filter: "[RecurringTransactionId] IS NOT NULL");
+                filter: "RecurringTransactionId IS NOT NULL");
         }
 
         /// <inheritdoc />
