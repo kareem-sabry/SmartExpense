@@ -27,9 +27,5 @@
       <ProjectReference Include="..\SmartExpense.Application\SmartExpense.Application.csproj" />
       <ProjectReference Include="..\SmartExpense.Infrastructure\SmartExpense.Infrastructure.csproj" />
     </ItemGroup>
-    <ItemGroup>
-      <Folder Include="Extensions\" />
-      <Folder Include="Jobs\" />
-    </ItemGroup>
     
 </Project>
