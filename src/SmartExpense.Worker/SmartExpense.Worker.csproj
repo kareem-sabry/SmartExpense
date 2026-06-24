@@ -26,6 +26,7 @@
     <ItemGroup>
       <ProjectReference Include="..\SmartExpense.Application\SmartExpense.Application.csproj" />
       <ProjectReference Include="..\SmartExpense.Infrastructure\SmartExpense.Infrastructure.csproj" />
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
     </ItemGroup>
     
 </Project>
