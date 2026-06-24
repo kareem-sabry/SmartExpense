@@ -28,21 +28,32 @@ try
 
     var host = builder.Build();
 
-    // Initialize the Quartz SQL Server schema before the Quartz scheduler starts.
-    //
-    // Timing: host is built (DI container ready, logger resolvable) but not yet
-    // running (Quartz scheduler not started). This is the correct window.
-    //
-    // In production CI/CD: this runs as a pre-deployment step, the same way
-    // EF Core migrations do. Here it is self-bootstrapping for local Docker.
     var startupLogger = host.Services.GetRequiredService<ILogger<Program>>();
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException(
-            "Connection string 'DefaultConnection' is required.");
+                           ?? throw new InvalidOperationException(
+                               "Connection string 'DefaultConnection' is required.");
 
-    await QuartzSchemaInitializer.EnsureSchemaCreatedAsync(
-        connectionString,
-        startupLogger);
+    const int maxAttempts = 12;
+    const int retryDelaySeconds = 5;
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            await QuartzSchemaInitializer.EnsureSchemaCreatedAsync(
+                connectionString, startupLogger);
+            break;
+        }
+        catch (Exception ex) when (attempt < maxAttempts)
+        {
+            startupLogger.LogWarning(
+                "Schema init failed (attempt {Attempt}/{Max}): {Message}. " +
+                "Retrying in {Delay}s — waiting for API migrations to complete...",
+                attempt, maxAttempts, ex.Message, retryDelaySeconds);
+
+            await Task.Delay(TimeSpan.FromSeconds(retryDelaySeconds));
+        }
+    }
 
     host.Run();
 }

@@ -56,7 +56,9 @@ internal static class QuartzSchemaInitializer
         {
             if (string.IsNullOrWhiteSpace(batch))
                 continue;
-
+            
+            if (batch.TrimStart().StartsWith("USE ", StringComparison.OrdinalIgnoreCase))
+                continue;
             await using var cmd = new SqlCommand(batch, connection);
             await cmd.ExecuteNonQueryAsync(cancellationToken);
         }

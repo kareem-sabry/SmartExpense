@@ -30,7 +30,23 @@
       timeout: 10s
       retries: 3
       start_period: 40s
-
+  worker:
+    build:
+      context: .
+      dockerfile: src/SmartExpense.Worker/Dockerfile
+    container_name: smartexpense-worker
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=db;Database=SmartExpense;User Id=sa;Password=${DB_PASSWORD};TrustServerCertificate=true;MultipleActiveResultSets=true
+      - Quartz__RecurringGenerationCron=0 5 0 * * ?
+      - Serilog__WriteTo__1__Name=Seq
+      - Serilog__WriteTo__1__Args__serverUrl=http://seq:80
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
+    restart: unless-stopped
   seq:
     image: datalust/seq:2025.2
     container_name: smartexpense-seq
